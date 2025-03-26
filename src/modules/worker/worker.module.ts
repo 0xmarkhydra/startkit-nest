@@ -7,21 +7,28 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ApiModule } from '@/api';
 import { BullModule } from '@nestjs/bull';
 import { UserConsumer } from './consumers';
+import { TelegramService } from '@/business/services/telegram.service';
+import { AuthService } from '@/business/services/auth.service';
+import { BusinessModule } from '@/business/business.module';
 
 const isWorker = Boolean(Number(process.env.IS_WORKER || 0));
 
 let consumers = [];
 let schedulers = [];
+let services = [
+];
 
 if (isWorker) {
   consumers = [UserConsumer];
   schedulers = [ScheduleService];
+  services = [TelegramService];
 }
 
 @Module({
   imports: [
     ApiModule,
     DatabaseModule,
+    BusinessModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory(config: ConfigService) {
@@ -50,7 +57,7 @@ if (isWorker) {
     ScheduleModule.forRoot(),
   ],
   controllers: [],
-  providers: [...consumers, ...schedulers],
+  providers: [...consumers, ...schedulers, ...services],
   exports: [],
 })
 export class WorkerModule {}

@@ -4,5 +4,14 @@ import { BaseEntity } from './base.entity';
 @Entity('users')
 export class UserEntity extends BaseEntity {
   @Column({ unique: true, nullable: true })
-  address: string;
+  telegram_id: string;
+
+  @Column({ unique: true, nullable: true })
+  telegram_username: string;
+
+  @Column({ nullable: true })
+  username: string;
+
+  @Column({ nullable: true })
+  email: string;
 }
