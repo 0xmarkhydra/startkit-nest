@@ -25,12 +25,17 @@ import { CurrentUser } from '@/shared/decorators/user.decorator';
 
 @ApiTags('Evaluate')
 @Controller('evaluate')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class EvaluateController {
   constructor(
     private readonly evaluateService: EvaluateService
 ) {}
+
+  @Get('data-excel')
+  @ApiOperation({ summary: 'Get data excel' })
+  async getDataExcel() {
+    return this.evaluateService.getDataExcel();
+  }
 
   @Put('update')
   @ApiOperation({ summary: 'Update evaluate result' })

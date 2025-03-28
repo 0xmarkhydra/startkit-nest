@@ -183,19 +183,89 @@ export class EvaluateService {
     }
   }
 
+  async getEvaluateResult() {
+    const evaluate = await this.evaluateResultRepository.find({ 
+      relations: ['user', 'create', 'member'],
+      where: { } 
+    });
+
+    const evaluateArray = evaluate.map((item, index) => {
+      console.log('item', item);
+      // return {
+      //   member: item.member.system_username,
+      //   user: item.user.system_username,
+      //   create: item.create.updated_at,
+      //   results: item.results,
+      // }
+      const results = item.results;
+
+      // array to object
+      const resultsObject = results.reduce((acc, curr) => {
+        acc[curr.order] = curr.point;
+        return acc;
+      }, {});
+
+      return [
+        index + 1,
+        item.member.system_username,
+        item.user.system_username,
+        item.create.username,
+        resultsObject[1],
+        resultsObject[2],
+        resultsObject[2],
+        resultsObject[3],
+        resultsObject[4],
+        resultsObject[5],
+        resultsObject[6],
+        resultsObject[7],
+        resultsObject[8],
+        resultsObject[9],
+        resultsObject[10],
+        resultsObject[11],
+        resultsObject[12],
+        resultsObject[13],
+        resultsObject[14],
+      ]
+    })
+
+    return evaluateArray;
+  }
+
+  async getTitleEvaluate() {
+    const evaluate = await this.evaluateRepository.find({ 
+      where: { },
+      order: { order: 'ASC' }
+    });
+
+    const evaluateArray = evaluate.map((item) => item.name)
+    console.log('evaluateArray', evaluateArray);
+
+    return ['STT', 'Nhân viên', 'Người đánh giá', 'Telegram đánh giá', ...evaluateArray];
+  }
+
+
+  async getDataExcel() {
+    const titleIds = await this.getTitleEvaluate();
+    const ids = await this.getEvaluateResult();
+    return [titleIds, ...ids];
+  }
+
+
   async onApplicationBootstrap() {
-    const evaluate = await this.getEvaluate(EvaluateCategory.ACHIEVEMENT_POINTS);
+    // const data = await this.getDataExcel();
 
-    console.log('evaluate', evaluate.map((item) => ({
-      order: item.order,
-      title: item.name,
-      max_point: item.max_point,
-      type: item.order === 7 ? 'string' : 'number',
-    })));
-    console.log(evaluate.map((item) => ({
-      order: item.order,
-      point: item.max_point,
-    })));
+    // console.log('data', data);
+    // const evaluate = await this.getEvaluate(EvaluateCategory.ACHIEVEMENT_POINTS);
 
+    // console.log('evaluate', evaluate.map((item) => ({
+    //   order: item.order,
+    //   title: item.name,
+    //   max_point: item.max_point,
+    //   type: item.order === 7 ? 'string' : 'number',
+    // })));
+    // console.log(evaluate.map((item) => ({
+    //   order: item.order,
+    //   point: item.max_point,
+    // })));
   }
 } 
