@@ -16,9 +16,7 @@ export class AuthService {
   ) {}
 
   async getAccessToken(payload: TJWTPayload) {
-    const expiresIn = this.configService.get<number>(
-        'auth.jwt.access_token_lifetime',
-      ) || 60 * 60 * 24 * 7;
+    const expiresIn = 60 * 60 * 24 * 7;
     return await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_SECRET_KEY,
       expiresIn: expiresIn,

@@ -12,14 +12,15 @@ import { configAuth } from './configs/auth';
 import { configCache } from './configs/cache';
 import { HttpCacheInterceptor } from './interceptors';
 import { BusinessModule } from '@/business/business.module';
+import { EvaluateController } from './controllers/evaluate.controller';
 
-const controllers = [HealthController, AuthController, UserController];
+const controllers = [HealthController, AuthController, UserController, EvaluateController];
 
 @Module({
   imports: [
     ThrottlerModule.forRoot({
       ttl: 60,
-      limit: process.env.APP_ENV === 'production' ? 60 : 600,
+      limit: 60,
     }),
     DatabaseModule,
     QueueModule,
@@ -45,7 +46,7 @@ const controllers = [HealthController, AuthController, UserController];
     }),
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('auth.jwt.jwt_secret_key'),
+        secret: process.env.JWT_SECRET_KEY,
         global: true,
       }),
       inject: [ConfigService],

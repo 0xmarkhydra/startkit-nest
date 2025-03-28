@@ -1,6 +1,5 @@
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
-import { EvaluateEntity } from './evaluate.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('evaluate_results')
@@ -12,29 +11,20 @@ export class EvaluateResultEntity extends BaseEntity {
   @Column({ name: 'member_id' })
   member_id: string;
 
+  @Column({ type: 'simple-json', nullable: true, default: {} })
+  results: any;
+
+  @Column({ name: 'create_id' })
+  create_id: string;
+
   @ManyToOne(() => UserEntity)
-  @JoinColumn({ name: 'evaluator_id' })
-  evaluator: UserEntity;
+  @JoinColumn({ name: 'create_id' })
+  create: UserEntity;
 
-  @Column({ name: 'evaluator_id' })
-  evaluator_id: string;
+  @Column({ name: 'user_id' })
+  user_id: string;
 
-  @ManyToOne(() => EvaluateEntity)
-  @JoinColumn({ name: 'evaluate_id' })
-  evaluate: EvaluateEntity;
-
-  @Column({ name: 'evaluate_id' })
-  evaluate_id: string;
-
-  @Column({ type: 'float' })
-  point: number;
-
-  @Column({ type: 'text', nullable: true })
-  comment: string;
-
-  @Column({ type: 'date' })
-  evaluation_date: Date;
-
-  @Column({ name: 'created_by' })
-  created_by: string;
-} 
+  @ManyToOne(() => UserEntity)
+  @JoinColumn({ name: 'user_id' })
+  user: UserEntity;
+}

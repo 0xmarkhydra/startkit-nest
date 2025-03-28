@@ -4,13 +4,13 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): TJWTPayload => {
     const request = ctx.switchToHttp().getRequest();
+    // if (process.env.APP_ENV === 'local') {
+    //   return {
+    //     sub: 'f9fe77c1-ed02-4270-ad60-8dca99101779',
+    //   };
+    // }
     return (
-      request?.user || {
-        sub:
-          !process.env.APP_ENV || process.env.APP_ENV === 'local'
-            ? '445df5bd-425a-4316-9548-1804a988d055'
-            : undefined,
-      }
+      request?.user
     );
   },
 );

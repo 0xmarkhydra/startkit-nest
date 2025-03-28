@@ -24,23 +24,26 @@ export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
-    if (process.env.APP_ENV === 'local') {
-      return true;
-    }
+    // if (process.env.APP_ENV === 'local') {
+    //   return true;
+    // }
+    console.log('token', token.length);
     if (token) {
       try {
         const payload: TJWTPayload = await this.jwtService.verifyAsync(token, {
-          secret: this.configService.get<string>('auth.key.jwt_secret_key'),
+          secret: process.env.JWT_SECRET_KEY,
         });
+        console.log('payload', payload);
+        const user = await this.userRepository.findOne({ where: { telegram_id: payload.sub } });
         if (
-          !(await this.userRepository.exists({ where: { id: payload.sub } }))
+          !user
         ) {
           throw {
             status_code: HttpStatus.UNAUTHORIZED,
             message: `Not found user`,
           };
         }
-        request['user'] = { ...payload };
+        request['user'] = { ...payload, sub: user.id, telegram_id: user.telegram_id };
       } catch (err) {
         throw new UnauthorizedException({
           status_code: HttpStatus.UNAUTHORIZED,

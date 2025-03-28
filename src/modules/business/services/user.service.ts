@@ -18,11 +18,15 @@ export class UserService {
 
   async verifyToken(token: string) {
     const payload: TJWTPayload = await this.authService.verifyAccessToken(token);
-    let user = await this.userRepository.findOne({ where: { telegram_id: payload.sub } });
+
+    console.log('payload', payload);
+
+    let user = await this.userRepository.findOne({ where: { telegram_id: payload.sub?.toString() } });
+    console.log('user', user);
     if (!user) {
         user = await this.userRepository.save({
-            telegram_id: payload.sub,
             username: payload.username,
+            telegram_id: payload.sub,
         });
     }
     return user;
@@ -32,13 +36,18 @@ export class UserService {
    * Get users with pagination and filter by department and role
    */
   async getUsers(page: number, take: number, department?: Department, role?: UserRole) {
+    console.log('department', department);
+    console.log('role', role);
+    console.log('page', page);
+    console.log('take', take);
+    
     // Create query builder
     const queryBuilder = this.userRepository.createQueryBuilder('user');
     
     // Apply filters if provided
-    if (department) {
-      queryBuilder.andWhere('user.department = :department', { department });
-    }
+    // if (department) {
+    //   queryBuilder.andWhere('user.department = :department', { department });
+    // }
     
     if (role) {
       queryBuilder.andWhere('user.role = :role', { role });

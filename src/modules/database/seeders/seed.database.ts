@@ -57,11 +57,22 @@ const evaluate = [
 const evaluateHR = [
   { name: 'Hoà đồng gắn kết ( tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 8 },
   { name: 'Tích cực tham gia các hoạt động chung (tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 9 },
-  { name: 'Giu gìn vệ sinh chung ( tối đa 5 điểm)- vi phạm trừ 1 điểm', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 9 },
+  { name: 'Giu gìn vệ sinh chung ( tối đa 5 điểm)- vi phạm trừ 1 điểm', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 10 },
   { name: 'Tuân thủ giờ làm ( tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 11 },
   { name: 'Họp, OT (tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 12 },
   { name: 'Nghỉ phép (tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 13 },
   { name: 'Chấm công ( tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 14 },
+];
+
+
+const _evaluateHR = [
+  { name: 'Hoà đồng gắn kết ( tối đa 10 điểm)', max_point: 10, category: EvaluateCategory.ATTITUDE_POINTS, order: 8 },
+  { name: 'Tích cực tham gia các hoạt động chung (tối đa 5 điểm)', max_point: 5, category: EvaluateCategory.ATTITUDE_POINTS, order: 9 },
+  { name: 'Giu gìn vệ sinh chung ( tối đa 5 điểm)- vi phạm trừ 1 điểm', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 10 },
+  { name: 'Tuân thủ giờ làm ( tối đa 10 điểm)', max_point: 10, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 11 },
+  { name: 'Họp, OT (tối đa 5 điểm)', max_point: 5, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 12 },
+  { name: 'Nghỉ phép (tối đa 10 điểm)', max_point: 10, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 13 },
+  { name: 'Chấm công ( tối đa 5 điểm)', max_point: 5, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 14 },
 ];
 
 @Injectable()
@@ -124,11 +135,33 @@ export class SeedDatabase implements OnApplicationBootstrap {
     });
   }
 
+  // export enum EvaluateCategory {
+  //   // ĐIỂM THÀNH TÍCH
+  //   ACHIEVEMENT_POINTS = 'ACHIEVEMENT_POINTS',
+  //   // Điểm ý thức thái độ 
+  //   ATTITUDE_POINTS = 'ATTITUDE_POINTS',
+  //   // Điểm chuyên cần
+  //   SPECIAL_REQUIREMENTS = 'SPECIAL_REQUIREMENTS',
+  // }
+  
+
+
   async onApplicationBootstrap() {
     const isWorker = Boolean(Number(process.env.IS_WORKER || 0));
     if (!isWorker) {
       return;
     }
+
+    const data = _evaluateHR.map((item) => ({
+      ...item,
+      id: item.order,
+      title: item.name,
+      maxOptions: item.max_point,
+      currentPoints: null,
+      type: 'number'
+    }));
+    console.log('data', data);
+
     const start = Date.now();
 
     await this.seedEvaluate();
