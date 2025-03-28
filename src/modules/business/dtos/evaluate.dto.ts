@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+
+export enum EvaluateTab {
+  HR = 'HR',
+  PM = 'PM',
+}
 
 export class EvaluatePointDto {
   @ApiProperty({ description: 'Order of evaluation item' })
@@ -29,8 +34,7 @@ export class UpdateEvaluateResultDto {
   @IsNotEmpty()
   data: EvaluatePointDto[];
 
-  // @ApiProperty({ description: 'Role of the evaluator' })
-  // @IsString()
-  // @IsNotEmpty()
-  // role: string;
+  @ApiProperty({ description: 'Tab of the evaluator', enum: EvaluateTab, required: false, default: EvaluateTab.PM })
+  @IsEnum(EvaluateTab)
+  tab: string;
 } 

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { EvaluateRepository, EvaluateResultRepository, UserRepository } from '../../database/repositories';
 import { Department, EvaluateCategory, EvaluateResultEntity, UserRole } from '@/database/entities';
 import { title } from 'process';
+import { EvaluateTab } from '../dtos/evaluate.dto';
 
 // Interfaces for type safety
 interface EvaluatePoint {
@@ -151,7 +152,8 @@ export class EvaluateService {
     userId: string,
     memberId: string,
     data: EvaluatePoint[],
-    createId: string
+    createId: string,
+    tab: EvaluateTab
   ): Promise<boolean> {
     const [user, userCreate, userMember] = await Promise.all([
       this.userRepository.findOne({ where: { id: userId } }),
@@ -162,19 +164,18 @@ export class EvaluateService {
     if (!user || !userCreate || !userMember) {
       throw new NotFoundException('User not found');
     }
-    console.log(`🔄 EvaluateService updateEvaluateResult:`, { userId, memberId, data, role: user.role, createId });
+    console.log(`🔄 EvaluateService updateEvaluateResult:`, { userId, memberId, data, role: tab, createId });
 
     try {
       console.log('=====> role user', user.role);
-      if (user.role === UserRole.PM) {
+      if (tab === EvaluateTab.PM) {
         return this.handlePMEvaluation(userId, memberId, data, createId);
       }
-      if (user.role === UserRole.ADMIN && userMember.department === Department.HR) {
+      if (tab === EvaluateTab.HR) {
         return this.handleOtherRoleEvaluation(userId, memberId, data, createId);
       }
-      if (user.role === UserRole.MEMBER) {
-        throw new ForbiddenException('You are not allowed to update evaluate result');
-      }
+      throw new ForbiddenException('You are not allowed to update evaluate result');
+
 
     } catch (error) {
       console.error(`❌ EvaluateService updateEvaluateResult error:`, error);

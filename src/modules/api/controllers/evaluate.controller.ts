@@ -19,7 +19,7 @@ import { UserService } from '@/business/services/user.service';
 import { EvaluateService } from '@/business/services/evaluate.service';
 import { GetUser } from '../../auth/decorators/get-user.decorator';
 import { UserEntity, UserRole } from '@/database/entities';
-import { UpdateEvaluateResultDto } from '../../business/dtos/evaluate.dto';
+import { EvaluateTab, UpdateEvaluateResultDto } from '../../business/dtos/evaluate.dto';
 import { TJWTPayload } from '@/shared/types';
 import { CurrentUser } from '@/shared/decorators/user.decorator';
 
@@ -46,7 +46,8 @@ export class EvaluateController {
       user.sub,
       updateDto.memberId,
       updateDto.data,
-      updateDto.createId
+      updateDto.createId,
+      updateDto.tab as EvaluateTab
     );
 
     return { success: result };
