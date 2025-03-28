@@ -4,11 +4,14 @@ import { Department, UserRole } from '../entities/user.entity';
 import { EvaluateCategory, EvaluateType } from '../entities/evaluate.entity';
 
 const members = [
-  { name: 'Xuân', department: 'Design' },
-  { name: 'Linh', department: 'Design' },
-  { name: 'Hiền', department: 'Design' },
+  { name: 'Nguyễn Xuân', department: 'Design' },
+  { name: 'Nguyễn Hiền', department: 'Design' },
+  { name: 'Hải Sơn', department: 'Design' },
+
   { name: 'Duy Hiếu', department: 'TESTER' },
   { name: 'Tình', department: 'TESTER' },
+  { name: 'Mai Phương', department: 'TESTER' },
+
   { name: 'Nguyễn Tuấn Hưng', department: 'DEV' },
   { name: 'Trần Văn Thành', department: 'DEV' },
   { name: 'Nguyễn Cảnh Nguyên', department: 'DEV' },
@@ -22,20 +25,33 @@ const members = [
   { name: 'Trịnh Công Đạt', department: 'DEV' },
   { name: 'Trần Văn Hiếu', department: 'DEV' },
   { name: 'Trịnh Văn Vinh', department: 'DEV' },
+  { name: 'Hà Văn Đạt', department: 'DEV' },
+  { name: 'Đỗ Tùng Dương', department: 'DEV' },
+  { name: 'Đỗ Hoàn', department: 'DEV' },
+  { name: 'Nguyễn Xuân Kiên', department: 'DEV' },
+  { name: 'Trần Công Minh', department: 'DEV' },
+
   { name: 'Vũ Minh Hiếu', department: 'AI' },
   { name: 'Nguyễn Văn Hiệp', department: 'AI' },
-  { name: 'Nguyễn Đình Toàn', department: 'AI' },
-  { name: 'Nguyễn Hoàng Anh', department: 'AI' },
+  { name: 'Ngô Phương Anh', department: 'AI' },
+  { name: 'Đào Thu Huyền', department: 'AI' },
+  { name: 'Nguyễn Hữu Thắng', department: 'AI' },
+
   { name: 'Đỗ Xuân Hải', department: 'BD' },
   { name: 'Cao Bá Quang', department: 'BD' },
   { name: 'Nguyễn Chi Mai', department: 'BD' },
   { name: 'Hồ Trung Hiếu', department: 'BD' },
   { name: 'Hoa Anh Tuấn', department: 'BD' },
+  { name: 'Trần Bảo Trung', department: 'BD' },
+  { name: 'Nguyễn Đình Duy', department: 'BD' },
+  { name: 'Nguyễn Minh Trang', department: 'BD' },
+  { name: 'Vũ Thành Long', department: 'BD' },
+  { name: 'Phạm Mai Anh', department: 'BD' },
 ];
 
 const membersPM = [
   { name: "Mr. David", account: "David96" },
-  { name: "Mr. Nguyén", account: "Nguyen" },
+  { name: "Mr. Nguyên", account: "Nguyen" },
   { name: "Mr. Lucas", account: "Lucas" },
   { name: "Mr. Conal", account: "Conal" },
   { name: "Mr. Arthur", account: "Arthur" },
