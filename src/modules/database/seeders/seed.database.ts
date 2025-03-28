@@ -51,17 +51,17 @@ const evaluate = [
   { name: 'Thực hiện nhiều dự án cùng lúc (+2 điểm/dự án)', max_point: 10, type: EvaluateType.PM, category: EvaluateCategory.ACHIEVEMENT_POINTS, order: 4 },
   { name: 'Hoàn thành trước KPI (thời gian, hiệu suất,...)', max_point: 5, type: EvaluateType.PM, category: EvaluateCategory.ACHIEVEMENT_POINTS, order: 5 },
   { name: 'Hỗ trợ team khác', max_point: 5, type: EvaluateType.PM, category: EvaluateCategory.ACHIEVEMENT_POINTS, order: 6 },
-  { name: 'Nhận xét của PM', max_point: 0, type: EvaluateType.PM, category: EvaluateCategory.ACHIEVEMENT_POINTS, order: 14 },
+  { name: 'Nhận xét của PM', max_point: 0, type: EvaluateType.PM, category: EvaluateCategory.ACHIEVEMENT_POINTS, order: 7 },
 ];
 
 const evaluateHR = [
-  { name: 'Hoà đồng gắn kết ( tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 7 },
-  { name: 'Tích cực tham gia các hoạt động chung (tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 8 },
+  { name: 'Hoà đồng gắn kết ( tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 8 },
+  { name: 'Tích cực tham gia các hoạt động chung (tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 9 },
   { name: 'Giu gìn vệ sinh chung ( tối đa 5 điểm)- vi phạm trừ 1 điểm', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.ATTITUDE_POINTS, order: 9 },
-  { name: 'Tuân thủ giờ làm ( tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 10 },
-  { name: 'Họp, OT (tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 11 },
-  { name: 'Nghỉ phép (tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 12 },
-  { name: 'Chấm công ( tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 13 },
+  { name: 'Tuân thủ giờ làm ( tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 11 },
+  { name: 'Họp, OT (tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 12 },
+  { name: 'Nghỉ phép (tối đa 10 điểm)', max_point: 10, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 13 },
+  { name: 'Chấm công ( tối đa 5 điểm)', max_point: 5, type: EvaluateType.HR, category: EvaluateCategory.SPECIAL_REQUIREMENTS, order: 14 },
 ];
 
 @Injectable()
