@@ -5,6 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { TJWTPayload } from '@/shared/types';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
+import { Department, UserRole } from '@/database/entities';
+import { paginate } from '@/shared/pagination/pagination';
+
 @Injectable()
 export class UserService {
   @Inject(UserRepository)
@@ -24,5 +27,27 @@ export class UserService {
     }
     return user;
   }
- 
+  
+  /**
+   * Get users with pagination and filter by department and role
+   */
+  async getUsers(page: number, take: number, department?: Department, role?: UserRole) {
+    // Create query builder
+    const queryBuilder = this.userRepository.createQueryBuilder('user');
+    
+    // Apply filters if provided
+    if (department) {
+      queryBuilder.andWhere('user.department = :department', { department });
+    }
+    
+    if (role) {
+      queryBuilder.andWhere('user.role = :role', { role });
+    }
+    
+    // Order by created_at descending
+    queryBuilder.orderBy('user.created_at', 'DESC');
+    
+    // Return paginated result
+    return paginate(queryBuilder, page, take);
+  }
 }

@@ -34,7 +34,7 @@ export class AuthService {
   async onApplicationBootstrap() {
     console.log('🚀 AuthService onApplicationBootstrap');
     const data = await this.getAccessToken({
-      sub: '0x1234567890123456789012345678901234567890',
+      sub: '1111111',
       username: 'test',
     });
     console.log('🚀 AuthService onApplicationBootstrap data:', data);

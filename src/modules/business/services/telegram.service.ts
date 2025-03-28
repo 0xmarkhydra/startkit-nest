@@ -30,18 +30,37 @@ export class TelegramService {
         return TelegramService.instance;
     }
 
+    private async handleStart(ctx: any): Promise<void> {
+        console.log('🔵 TelegramService handleStart :', { ctx });
+        const webUrl = process.env.WEB_URL;
+        const accessToken = await this.getCode(ctx);
+        const surveyUrl = webUrl + '?code=' + accessToken;
+        const keyboard = Markup.inlineKeyboard([
+            [Markup.button.url('Login', surveyUrl)]
+        ]);
+
+        // Send a more detailed welcome message with the login button
+        await ctx.reply(
+            'Welcome to HR Support Bot! 👋\n\n' +
+            'I am here to assist you with HR-related inquiries and services. ' +
+            'Please click the button below to log in and access all available features.',
+            keyboard
+        );
+    }
+
     private initializeCommands(): void {
         // Handle /start command with survey parameter
         this.bot.command('start', async (ctx) => {
             console.log('ctx', ctx.message);
             console.log('payload', ctx.payload);
             console.log('🔵 TelegramService initializeCommands /start command received');
-            if(ctx.payload = COMMANDS.SURVEY) {
+            if(ctx.payload === COMMANDS.SURVEY) {
                 await this.handleSurveyStart(ctx);
             } else {
-                await ctx.reply('Welcome! I am an HR Support Bot');
+                await this.handleStart(ctx);
             }
         });
+
         this.bot.command('survey', async (ctx) => {
             console.log('🔵 TelegramService initializeCommands /survey command received');
             await this.handleSurveyStart(ctx);
@@ -57,6 +76,15 @@ export class TelegramService {
     //     console.log('🔵 TelegramService handleHelp :', { ctx });
     //     await ctx.reply('I am an HR Support Bot. How can I assist you today?');
     // }
+
+    private async getCode(ctx: any): Promise<string> {
+        const payloadJWT = {
+            sub: ctx.from.id,
+            username: ctx.from.username,
+        }
+        const accessToken = await this.authService.getAccessToken(payloadJWT);
+        return accessToken;
+    }
 
     private async handleSurveyStart(ctx: any): Promise<void> {
         console.log('🔵 TelegramService handleSurveyStart :', { ctx });
@@ -74,12 +102,8 @@ export class TelegramService {
             return;
         }
 
-        const payloadJWT = {
-            sub: ctx.from.id,
-            username: ctx.from.username,
-        }
-        const accessToken = await this.authService.getAccessToken(payloadJWT);
-        const surveyUrl = webUrl + '?code=' + accessToken;
+        const accessToken = await this.getCode(ctx);
+        const surveyUrl = webUrl + '/evaluation?code=' + accessToken;
         
         const keyboard = Markup.inlineKeyboard([
             [Markup.button.url('Take Survey', surveyUrl)]
