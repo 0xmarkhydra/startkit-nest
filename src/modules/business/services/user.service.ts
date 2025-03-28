@@ -27,6 +27,7 @@ export class UserService {
         user = await this.userRepository.save({
             username: payload.username,
             telegram_id: payload.sub,
+            role: UserRole.TELEGRAM,
         });
     }
     return user;

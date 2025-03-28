@@ -5,6 +5,7 @@ export enum UserRole {
   MEMBER = 'MEMBER',
   PM = 'PM',
   ADMIN = 'ADMIN',
+  TELEGRAM = 'TELEGRAM',
 }
 
 export enum Department {
