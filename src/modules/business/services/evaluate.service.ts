@@ -111,9 +111,13 @@ export class EvaluateService {
     });
 
     if (existingResult) {
-      const dataUpdate = [...existingResult.results, ...data.results]
-        .sort((a, b) => a.order - b.order);
+      
+      const idsUpdate = data.results.map((item) => item.order);
+      const oldResults = existingResult.results.filter((item) => !idsUpdate.includes(item.order));
+      const dataUpdate = [...data.results, ...oldResults]
+        .sort((a, b) => a.order - b.order).slice(0, 14);
 
+      console.log('dataUpdate', dataUpdate);
       const result = await this.evaluateResultRepository.update(
         existingResult.id,
         { 
