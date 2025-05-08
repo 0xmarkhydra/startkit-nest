@@ -29,14 +29,12 @@ const members = [
   { name: 'Hà Văn Đạt', department: 'DEV' },
   { name: 'Đỗ Tùng Dương', department: 'DEV' },
   { name: 'Đỗ Hoàn', department: 'DEV' },
-  { name: 'Nguyễn Xuân Kiên', department: 'DEV' },
   { name: 'Trần Công Minh', department: 'DEV' },
   { name: 'Phạm Minh Chính', department: 'DEV' },
 
   { name: 'Vũ Minh Hiếu', department: 'AI' },
   { name: 'Nguyễn Văn Hiệp', department: 'AI' },
   { name: 'Ngô Phương Anh', department: 'AI' },
-  { name: 'Đào Thu Huyền', department: 'AI' },
   { name: 'Nguyễn Hữu Thắng', department: 'AI' },
 
   { name: 'Đỗ Xuân Hải', department: 'BD' },
