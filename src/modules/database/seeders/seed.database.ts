@@ -48,6 +48,7 @@ const members = [
   { name: 'Phạm Mai Anh', department: 'BD' },
   { name: 'Lê Bảo Anh', department: 'BD' },
   { name: 'Nguyễn Chí Hiếu', department: 'BD' },
+  { name: 'Lê Duy Tùng', department: 'BD' },
 ];
 
 const membersPM = [
