@@ -37,7 +37,6 @@ const members = [
   { name: 'Ngô Phương Anh', department: 'AI' },
   { name: 'Nguyễn Hữu Thắng', department: 'AI' },
 
-  { name: 'Đỗ Xuân Hải', department: 'BD' },
   { name: 'Cao Bá Quang', department: 'BD' },
   { name: 'Nguyễn Chi Mai', department: 'BD' },
   { name: 'Hồ Trung Hiếu', department: 'BD' },
