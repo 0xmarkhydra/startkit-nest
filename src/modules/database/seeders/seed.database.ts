@@ -7,6 +7,7 @@ const members = [
   { name: 'Nguyễn Xuân', department: 'Design' },
   { name: 'Nguyễn Hiền', department: 'Design' },
   { name: 'Hải Sơn', department: 'Design' },
+  { name: 'Đào Hải Sơn', department: 'Design' },
 
   { name: 'Duy Hiếu', department: 'TESTER' },
   { name: 'Tình', department: 'TESTER' },
@@ -30,6 +31,7 @@ const members = [
   { name: 'Đỗ Hoàn', department: 'DEV' },
   { name: 'Nguyễn Xuân Kiên', department: 'DEV' },
   { name: 'Trần Công Minh', department: 'DEV' },
+  { name: 'Phạm Minh Chính', department: 'DEV' },
 
   { name: 'Vũ Minh Hiếu', department: 'AI' },
   { name: 'Nguyễn Văn Hiệp', department: 'AI' },
@@ -47,6 +49,8 @@ const members = [
   { name: 'Nguyễn Minh Trang', department: 'BD' },
   { name: 'Vũ Thành Long', department: 'BD' },
   { name: 'Phạm Mai Anh', department: 'BD' },
+  { name: 'Lê Bảo Anh', department: 'BD' },
+  { name: 'Nguyễn Chí Hiếu', department: 'BD' },
 ];
 
 const membersPM = [
