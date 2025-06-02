@@ -39,6 +39,7 @@
     "bull": "^4.11.3",
     "cache-manager": "^5.5.2",
     "cache-manager-redis-store": "^3.0.1",
+    "ccxt": "^4.4.86",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "crypto-js": "^4.1.1",
