@@ -1,6 +1,8 @@
-import { Module, OnApplicationBootstrap } from '@nestjs/common';
+import { Module, OnApplicationBootstrap, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '@/database';
 import { HealthController } from '@/api/controllers';
+import { TelegramController } from './controllers/telegram.controller';
+import { TradingPairController } from './controllers/trading-pair.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { QueueModule } from '@/queue/queue.module';
@@ -13,7 +15,11 @@ import { configCache } from './configs/cache';
 import { HttpCacheInterceptor } from './interceptors';
 import { BusinessModule } from '@/business/business.module';
 
-const controllers = [HealthController];
+const controllers = [
+  HealthController,
+  TelegramController,
+  TradingPairController,
+];
 
 @Module({
   imports: [
@@ -23,7 +29,7 @@ const controllers = [HealthController];
     }),
     DatabaseModule,
     QueueModule,
-    BusinessModule,
+    forwardRef(() => BusinessModule),
     CacheModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -69,6 +75,7 @@ const controllers = [HealthController];
   ],
   exports: [],
 })
+
 export class ApiModule implements OnApplicationBootstrap {
   constructor() {}
 
