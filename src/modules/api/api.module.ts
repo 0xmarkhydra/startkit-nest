@@ -3,6 +3,7 @@ import { DatabaseModule } from '@/database';
 import { HealthController } from '@/api/controllers';
 import { TelegramController } from './controllers/telegram.controller';
 import { TradingPairController } from './controllers/trading-pair.controller';
+import { FrontendController } from './controllers/frontend.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { QueueModule } from '@/queue/queue.module';
@@ -19,6 +20,7 @@ const controllers = [
   HealthController,
   TelegramController,
   TradingPairController,
+  FrontendController,
 ];
 
 @Module({

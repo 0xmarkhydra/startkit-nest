@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Trading Pairs View</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .status-active {
+            color: green;
+            font-weight: bold;
+        }
+        .status-inactive {
+            color: red;
+        }
+        #error-message {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Trading Pairs</h1>
+    <div id="error-message"></div>
+    <h2>Active Trading Pairs</h2>
+    <table id="active-pairs">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Status</th>
+                <th>Created At</th>
+                <th>ID</th>
+            </tr>
+        </thead>
+        <tbody id="active-pairs-body">
+            <tr>
+                <td colspan="4">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        // Sử dụng snake_case cho tất cả các trường theo yêu cầu
+        document.addEventListener('DOMContentLoaded', async () => {
+            const errorMessage = document.getElementById('error-message');
+            const activePairsBody = document.getElementById('active-pairs-body');
+
+            try {
+                console.log('Fetching active trading pairs...');
+                const response = await fetch('http://localhost:8000/trading-pairs/active');
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Data received:', data);
+                
+                if (data && data.length > 0) {
+                    activePairsBody.innerHTML = '';
+                    
+                    data.forEach(pair => {
+                        const row = document.createElement('tr');
+                        const date = new Date(pair.created_at);
+                        const formattedDate = date.toLocaleString();
+                        
+                        row.innerHTML = `
+                            <td>${pair.symbol}</td>
+                            <td class="${pair.is_active ? 'status-active' : 'status-inactive'}">
+                                ${pair.is_active ? 'Active' : 'Inactive'}
+                            </td>
+                            <td>${formattedDate}</td>
+                            <td>${pair.id}</td>
+                        `;
+                        activePairsBody.appendChild(row);
+                    });
+                } else {
+                    activePairsBody.innerHTML = '<tr><td colspan="4">No active trading pairs found</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                errorMessage.textContent = `Error: ${error.message}`;
+                activePairsBody.innerHTML = '<tr><td colspan="4">Failed to load data</td></tr>';
+            }
+        });
+    </script>
+</body>
+</html>

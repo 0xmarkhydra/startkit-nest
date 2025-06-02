@@ -4,25 +4,27 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 const isApi = Boolean(Number(process.env.IS_API || 0));
 
 const PORT = process.env.PORT || '3000';
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // logger: false,
     // bufferLogs: true,
   });
+  
+  // Serve static files from the public directory
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
   if (isApi) {
-    // const corsOrigin = process.env.CORS_ORIGIN.split(',') || [
-    //   'http://localhost:3000',
-    // ];
-
     app.enableCors({
-      // allowedHeaders: ['content-type'],
+      allowedHeaders: ['content-type', 'authorization'],
       origin: '*',
-      // credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      credentials: true,
     });
 
     app.useLogger(app.get(PinoLogger));

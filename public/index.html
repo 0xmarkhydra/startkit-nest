@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Pairs Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Trading Pairs Dashboard</h1>
+        </header>
+        
+        <main>
+            <section class="card">
+                <h2>Active Trading Pairs</h2>
+                <div class="table-container">
+                    <table id="active-pairs-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="active-pairs-body">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                    <div id="active-loading" class="loading">Loading...</div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>All Trading Pairs</h2>
+                <div class="table-container">
+                    <table id="all-pairs-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="all-pairs-body">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                    <div id="all-loading" class="loading">Loading...</div>
+                </div>
+            </section>
+
+            <section class="card collapsible-card">
+                <div class="card-header">
+                    <h2>Add New Trading Pair</h2>
+                    <button type="button" class="toggle-btn" id="toggle-add-form">+</button>
+                </div>
+                <div class="card-content" id="add-form-content" style="display: none;">
+                    <form id="add-pair-form">
+                        <div class="form-group">
+                            <label for="symbol">Symbol:</label>
+                            <input type="text" id="symbol" name="symbol" placeholder="e.g. BTC/USDT" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="is-active">Status:</label>
+                            <select id="is-active" name="is_active">
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Trading Pair</button>
+                    </form>
+                    <div id="form-message" class="message"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
