@@ -4,14 +4,21 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 const isApi = Boolean(Number(process.env.IS_API || 0));
 
 const PORT = process.env.PORT || '3000';
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // logger: false,
     // bufferLogs: true,
+  });
+
+  // Serve static files from the public directory at root level
+  app.useStaticAssets(join(process.cwd(), 'public'), {
+    prefix: '/public/',
   });
 
   if (isApi) {

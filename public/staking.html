@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staking Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Sử dụng phiên bản cụ thể của Solana Web3.js -->
+    <script src="https://unpkg.com/@solana/web3.js@1.73.0/lib/index.iife.min.js"></script>
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #6c5ce7;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background-color: #6c5ce7;
+            border-color: #6c5ce7;
+        }
+        .btn-primary:hover {
+            background-color: #5649c0;
+            border-color: #5649c0;
+        }
+        .container {
+            max-width: 1000px;
+            margin-top: 50px;
+        }
+        .stats-card {
+            text-align: center;
+            padding: 20px;
+        }
+        .stats-card h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .stats-card p {
+            font-size: 32px;
+            font-weight: bold;
+            color: #6c5ce7;
+        }
+        .staking-form {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .alert {
+            margin-top: 10px;
+        }
+        .troubleshooting {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .troubleshooting h4 {
+            margin-bottom: 10px;
+        }
+        .troubleshooting ul {
+            padding-left: 20px;
+        }
+        .vault-info {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9f7fe;
+            border-radius: 5px;
+            border: 1px solid #b3e0ff;
+        }
+        .vault-address {
+            font-family: monospace;
+            font-weight: bold;
+            word-break: break-all;
+        }
+        .btn-group {
+            margin-bottom: 15px;
+        }
+        .copy-btn {
+            cursor: pointer;
+            margin-left: 5px;
+            font-size: 0.8rem;
+            padding: 2px 5px;
+            background-color: #eee;
+            border-radius: 3px;
+        }
+        .copy-btn:hover {
+            background-color: #ddd;
+        }
+        .copy-success {
+            color: green;
+            font-size: 0.8rem;
+            margin-left: 5px;
+            display: none;
+        }
+        .step-instructions {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c5ce7;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+        .step-instructions h5 {
+            color: #6c5ce7;
+            margin-bottom: 10px;
+        }
+        .step-instructions img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .step-number {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background-color: #6c5ce7;
+            color: white;
+            text-align: center;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-5">Staking Dashboard</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card stats-card">
+                    <h3>Total Staked</h3>
+                    <p id="totalStaked">0 USDC</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stats-card">
+                    <h3>Current Earnings</h3>
+                    <p id="currentEarnings">0 USDC</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stats-card">
+                    <h3>Expected Return</h3>
+                    <p id="expectedReturn">0 USDC</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="staking-form">
+                    <h3 class="mb-4">Stake USDC</h3>
+                    <div id="walletStatus" class="alert alert-info">
+                        Wallet status: Not connected
+                    </div>
+                    <div class="vault-info">
+                        <h5>Vault Address <span class="copy-btn" onclick="copyVaultAddress()">Copy</span> <span class="copy-success">Copied!</span></h5>
+                        <p class="vault-address">HaWVomK4cHsWtED9SeTe5hRuhuinCcsHU6ZiiGntckNc</p>
+                        <p class="mb-0">Send your USDC to this address to start staking</p>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label for="amount" class="form-label">Amount (min. 1 USDC)</label>
+                        <input type="number" class="form-control" id="amount" min="1" placeholder="Enter amount">
+                    </div>
+                    <div class="btn-group">
+                        <button id="connectWalletBtn" class="btn btn-primary mb-3">Connect Phantom Wallet</button>
+                    </div>
+                    <div class="btn-group">
+                        <button id="openPhantomBtn" class="btn btn-info mb-3 me-2" disabled>Open Phantom to Send USDC</button>
+                    </div>
+                    <div class="btn-group">
+                        <button id="sendUSDCBtn" class="btn btn-warning mb-3 me-2" disabled>I've Sent USDC</button>
+                        <button id="stakeBtn" class="btn btn-success" disabled>Complete Staking</button>
+                    </div>
+                    
+                    <div class="step-instructions">
+                        <h5><span class="step-number">1</span> Kết nối ví Phantom</h5>
+                        <p>Nhấn nút "Connect Phantom Wallet" để kết nối với ví Phantom của bạn.</p>
+                    </div>
+                    
+                    <div class="step-instructions">
+                        <h5><span class="step-number">2</span> Gửi USDC đến ví vault</h5>
+                        <p>Nhấn nút "Open Phantom to Send USDC" để mở Phantom và gửi USDC:</p>
+                        <ol>
+                            <li>Trong Phantom, chọn USDC từ danh sách token</li>
+                            <li>Nhấn nút "Send"</li>
+                            <li>Dán địa chỉ vault: <code>HaWVomK4cHsWtED9SeTe5hRuhuinCcsHU6ZiiGntckNc</code></li>
+                            <li>Nhập số tiền bạn muốn stake (tối thiểu 1 USDC)</li>
+                            <li>Xác nhận giao dịch</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="step-instructions">
+                        <h5><span class="step-number">3</span> Xác nhận và hoàn tất staking</h5>
+                        <p>Sau khi gửi USDC thành công:</p>
+                        <ol>
+                            <li>Nhập số tiền đã gửi vào ô "Amount" ở trên</li>
+                            <li>Nhấn nút "I've Sent USDC" để xác nhận</li>
+                            <li>Nhấn nút "Complete Staking" để hoàn tất quy trình</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="troubleshooting">
+                        <h4>Troubleshooting Connection Issues:</h4>
+                        <ul>
+                            <li>Make sure Phantom extension is installed and up-to-date</li>
+                            <li>Try refreshing the page</li>
+                            <li>Ensure you're on a supported browser (Chrome, Firefox, Brave)</li>
+                            <li>Check if Phantom is unlocked</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Active Stakings
+                    </div>
+                    <div class="card-body">
+                        <div id="stakingsList">
+                            <p class="text-center">Connect your wallet to view your stakings</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let walletAddress = null;
+        let lastTransactionSignature = null;
+        const apiBaseUrl = '';
+        const vaultAddress = 'HaWVomK4cHsWtED9SeTe5hRuhuinCcsHU6ZiiGntckNc';
+        // USDC token address on Solana (devnet)
+        const usdcMintAddress = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const walletStatusEl = document.getElementById('walletStatus');
+        
+        // Copy vault address to clipboard
+        function copyVaultAddress() {
+            navigator.clipboard.writeText(vaultAddress).then(() => {
+                const copySuccess = document.querySelector('.copy-success');
+                copySuccess.style.display = 'inline';
+                setTimeout(() => {
+                    copySuccess.style.display = 'none';
+                }, 2000);
+            });
+        }
+        
+        // Get Phantom provider
+        const getProvider = () => {
+            if ('phantom' in window) {
+                const provider = window.phantom?.solana;
+                
+                if (provider?.isPhantom) {
+                    return provider;
+                }
+            }
+            
+            return null;
+        };
+
+        // Check if Phantom is installed
+        function checkPhantomWallet() {
+            const provider = getProvider();
+            
+            if (!provider) {
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Please install Phantom wallet extension first!';
+                walletStatusEl.innerHTML += '<br><a href="https://phantom.app/" target="_blank">Click here to install Phantom</a>';
+                return false;
+            }
+            
+            return true;
+        }
+
+        // Connect to Phantom wallet
+        async function connectWallet() {
+            try {
+                const provider = getProvider();
+                if (!provider) {
+                    walletStatusEl.className = 'alert alert-danger';
+                    walletStatusEl.textContent = 'Error: Phantom wallet not found';
+                    return;
+                }
+                
+                walletStatusEl.className = 'alert alert-info';
+                walletStatusEl.textContent = 'Connecting to wallet...';
+                
+                // Try to connect with retries
+                let attempts = 0;
+                const maxAttempts = 3;
+                let connected = false;
+                
+                while (attempts < maxAttempts && !connected) {
+                    try {
+                        attempts++;
+                        // Connect to wallet
+                        const resp = await provider.connect();
+                        walletAddress = resp.publicKey.toString();
+                        connected = true;
+                    } catch (err) {
+                        console.warn(`Connection attempt ${attempts} failed:`, err);
+                        if (attempts >= maxAttempts) throw err;
+                        // Wait a bit before retrying
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+                
+                document.getElementById('connectWalletBtn').textContent = 'Connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                document.getElementById('openPhantomBtn').disabled = false;
+                document.getElementById('sendUSDCBtn').disabled = false;
+                
+                walletStatusEl.className = 'alert alert-success';
+                walletStatusEl.textContent = 'Wallet connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                
+                // Load user's stakings
+                loadStakings();
+            } catch (err) {
+                console.error("Error connecting to wallet:", err);
+                walletStatusEl.className = 'alert alert-danger';
+                
+                // Handle specific error types
+                if (err.code === 4001) {
+                    walletStatusEl.textContent = 'Error: Connection rejected by user. Please try again.';
+                } else if (err.message && err.message.includes("already connected")) {
+                    // Already connected error - try to get the public key
+                    try {
+                        const provider = getProvider();
+                        if (provider && provider.publicKey) {
+                            walletAddress = provider.publicKey.toString();
+                            document.getElementById('connectWalletBtn').textContent = 'Connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                            document.getElementById('openPhantomBtn').disabled = false;
+                            document.getElementById('sendUSDCBtn').disabled = false;
+                            
+                            walletStatusEl.className = 'alert alert-success';
+                            walletStatusEl.textContent = 'Wallet connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                            
+                            loadStakings();
+                            return;
+                        }
+                    } catch (innerErr) {
+                        console.error("Error getting public key:", innerErr);
+                    }
+                    
+                    walletStatusEl.textContent = 'Error: Wallet already connected but cannot access public key. Please refresh the page.';
+                } else {
+                    walletStatusEl.textContent = 'Error connecting to wallet: ' + (err.message || 'Unexpected error');
+                    walletStatusEl.innerHTML += '<br>Please try refreshing the page or reconnecting your wallet in the Phantom extension.';
+                }
+            }
+        }
+
+        // Check if wallet is already connected on page load
+        async function checkWalletConnection() {
+            try {
+                const provider = getProvider();
+                if (!provider) {
+                    return;
+                }
+                
+                // Check if already connected
+                if (provider.isConnected && provider.publicKey) {
+                    walletAddress = provider.publicKey.toString();
+                    
+                    document.getElementById('connectWalletBtn').textContent = 'Connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                    document.getElementById('openPhantomBtn').disabled = false;
+                    document.getElementById('sendUSDCBtn').disabled = false;
+                    
+                    walletStatusEl.className = 'alert alert-success';
+                    walletStatusEl.textContent = 'Wallet connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                    
+                    // Load user's stakings
+                    loadStakings();
+                    return;
+                }
+                
+                // Try to connect with onlyIfTrusted flag
+                try {
+                    const resp = await provider.connect({ onlyIfTrusted: true });
+                    walletAddress = resp.publicKey.toString();
+                    
+                    document.getElementById('connectWalletBtn').textContent = 'Connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                    document.getElementById('openPhantomBtn').disabled = false;
+                    document.getElementById('sendUSDCBtn').disabled = false;
+                    
+                    walletStatusEl.className = 'alert alert-success';
+                    walletStatusEl.textContent = 'Wallet connected: ' + walletAddress.substring(0, 4) + '...' + walletAddress.substring(walletAddress.length - 4);
+                    
+                    // Load user's stakings
+                    loadStakings();
+                } catch (err) {
+                    // Not connected yet or not trusted, which is fine
+                    console.log("Wallet not auto-connected:", err);
+                }
+            } catch (err) {
+                // Not connected yet, which is fine
+                console.log("Wallet check failed:", err);
+            }
+        }
+        
+        // Open Phantom wallet to send USDC
+        function openPhantomWallet() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            
+            if (isNaN(amount) || amount < 1) {
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Please enter a valid amount (minimum 1 USDC)';
+                return;
+            }
+            
+            walletStatusEl.className = 'alert alert-info';
+            walletStatusEl.textContent = 'Đang mở Phantom Wallet...';
+            
+            try {
+                const provider = getProvider();
+                if (!provider) {
+                    walletStatusEl.className = 'alert alert-danger';
+                    walletStatusEl.textContent = 'Error: Phantom wallet not found';
+                    return;
+                }
+                
+                // Tạo giao dịch chuyển USDC
+                const amountInLamports = amount * 1000000; // USDC có 6 số thập phân
+                
+                // Tạo transaction để gửi USDC
+                const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
+                const transaction = new solanaWeb3.Transaction();
+                
+                // Tạo instruction chuyển USDC
+                // Sử dụng phương thức connect để đảm bảo Phantom được mở ra
+                provider.connect().then(async (resp) => {
+                    // Sau khi kết nối thành công, tạo giao dịch chuyển token
+                    try {
+                        // Tạo instruction để chuyển token
+                        // Sử dụng phương thức signAndSendTransaction để mở Phantom và yêu cầu người dùng ký giao dịch
+                        await provider.signAndSendTransaction(transaction);
+                        
+                        // Hiển thị hướng dẫn gửi USDC
+                        alert(`Phantom Wallet đã được mở. Vui lòng thực hiện các bước sau để gửi USDC:
+                        
+1. Trong Phantom, chọn USDC từ danh sách token
+2. Nhấn nút "Send"
+3. Dán địa chỉ vault: ${vaultAddress}
+4. Nhập số tiền: ${amount} USDC
+5. Xác nhận giao dịch
+6. Quay lại trang web này và nhấn "I've Sent USDC"`);
+                        
+                        // Sao chép địa chỉ vault vào clipboard
+                        navigator.clipboard.writeText(vaultAddress);
+                        
+                        walletStatusEl.className = 'alert alert-info';
+                        walletStatusEl.textContent = 'Phantom Wallet đã được mở. Vui lòng gửi USDC đến địa chỉ vault.';
+                    } catch (error) {
+                        console.error("Error opening Phantom:", error);
+                        
+                        // Nếu có lỗi, hiển thị hướng dẫn thủ công
+                        alert(`Vui lòng mở Phantom Wallet thủ công và làm theo các bước sau:
+                        
+1. Mở extension Phantom
+2. Chọn USDC từ danh sách token
+3. Nhấn nút "Send"
+4. Dán địa chỉ vault: ${vaultAddress}
+5. Nhập số tiền: ${amount} USDC
+6. Xác nhận giao dịch
+7. Quay lại trang web này và nhấn "I've Sent USDC"`);
+                        
+                        // Sao chép địa chỉ vault vào clipboard
+                        navigator.clipboard.writeText(vaultAddress);
+                        
+                        walletStatusEl.className = 'alert alert-warning';
+                        walletStatusEl.textContent = 'Không thể mở Phantom tự động. Vui lòng mở Phantom thủ công và gửi USDC.';
+                    }
+                }).catch(error => {
+                    console.error("Connection error:", error);
+                    
+                    // Nếu không thể kết nối, hiển thị hướng dẫn thủ công
+                    alert(`Vui lòng mở Phantom Wallet thủ công và làm theo các bước sau:
+                    
+1. Mở extension Phantom
+2. Chọn USDC từ danh sách token
+3. Nhấn nút "Send"
+4. Dán địa chỉ vault: ${vaultAddress}
+5. Nhập số tiền: ${amount} USDC
+6. Xác nhận giao dịch
+7. Quay lại trang web này và nhấn "I've Sent USDC"`);
+                    
+                    // Sao chép địa chỉ vault vào clipboard
+                    navigator.clipboard.writeText(vaultAddress);
+                    
+                    walletStatusEl.className = 'alert alert-warning';
+                    walletStatusEl.textContent = 'Không thể mở Phantom tự động. Vui lòng mở Phantom thủ công và gửi USDC.';
+                });
+            } catch (err) {
+                console.error("Error with Phantom:", err);
+                
+                // Nếu có lỗi, hiển thị hướng dẫn thủ công
+                alert(`Vui lòng mở Phantom Wallet thủ công và làm theo các bước sau:
+                
+1. Mở extension Phantom
+2. Chọn USDC từ danh sách token
+3. Nhấn nút "Send"
+4. Dán địa chỉ vault: ${vaultAddress}
+5. Nhập số tiền: ${amount} USDC
+6. Xác nhận giao dịch
+7. Quay lại trang web này và nhấn "I've Sent USDC"`);
+                
+                // Sao chép địa chỉ vault vào clipboard
+                navigator.clipboard.writeText(vaultAddress);
+                
+                walletStatusEl.className = 'alert alert-warning';
+                walletStatusEl.textContent = 'Không thể mở Phantom tự động. Vui lòng mở Phantom thủ công và gửi USDC.';
+            }
+        }
+
+        // Confirm USDC sent
+        function confirmUSDCSent() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            
+            if (isNaN(amount) || amount < 1) {
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Please enter a valid amount (minimum 1 USDC)';
+                return;
+            }
+            
+            // Confirm with user
+            if (confirm(`Bạn đã gửi ${amount} USDC đến địa chỉ vault chưa? Nhấn OK để xác nhận.`)) {
+                // Generate a manual transaction ID
+                lastTransactionSignature = 'manual_tx_' + Date.now();
+                
+                walletStatusEl.className = 'alert alert-success';
+                walletStatusEl.textContent = 'USDC transfer confirmed! Now click "Complete Staking" to finalize.';
+                document.getElementById('stakeBtn').disabled = false;
+            }
+        }
+
+        // Load user's stakings
+        async function loadStakings() {
+            if (!walletAddress) return;
+            
+            try {
+                const response = await fetch(`${apiBaseUrl}/staking/wallet/${walletAddress}`);
+                const stakings = await response.json();
+                
+                displayStakings(stakings.data);
+                updateStats(stakings.data);
+            } catch (err) {
+                console.error("Error loading stakings:", err);
+                walletStatusEl.className = 'alert alert-warning';
+                walletStatusEl.textContent = 'Warning: Failed to load stakings. API may not be available.';
+            }
+        }
+
+        // Display stakings in the UI
+        function displayStakings(stakings) {
+            const stakingsList = document.getElementById('stakingsList');
+            
+            if (!stakings || stakings.length === 0) {
+                stakingsList.innerHTML = '<p class="text-center">No active stakings found</p>';
+                return;
+            }
+            
+            let html = '';
+            stakings.forEach(staking => {
+                const startDate = new Date(staking.startDate).toLocaleDateString();
+                const endDate = new Date(staking.endDate).toLocaleDateString();
+                
+                html += `
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Amount: ${staking.amount} USDC</h5>
+                        <p class="card-text">Current Earnings: ${staking.currentEarnings.toFixed(2)} USDC</p>
+                        <p class="card-text">Start Date: ${startDate}</p>
+                        <p class="card-text">End Date: ${endDate}</p>
+                        <p class="card-text">Status: ${staking.status}</p>
+                        ${staking.status === 'active' ? 
+                            `<button class="btn btn-warning btn-sm withdraw-btn" data-id="${staking.id}">Withdraw</button>` : 
+                            ''}
+                    </div>
+                </div>
+                `;
+            });
+            
+            stakingsList.innerHTML = html;
+            
+            // Add event listeners to withdraw buttons
+            document.querySelectorAll('.withdraw-btn').forEach(btn => {
+                btn.addEventListener('click', () => withdrawStaking(btn.getAttribute('data-id')));
+            });
+        }
+
+        // Update stats in the UI
+        function updateStats(stakings) {
+            let totalStaked = 0;
+            let totalEarnings = 0;
+            let totalExpectedReturn = 0;
+            
+            if (stakings && stakings.length > 0) {
+                stakings.forEach(staking => {
+                    if (staking.status === 'active') {
+                        totalStaked += parseFloat(staking.amount) || 0;
+                        totalEarnings += parseFloat(staking.currentEarnings) || 0;
+                        totalExpectedReturn += parseFloat(staking.expectedReturn) || 0;
+                    }
+                });
+            }
+            
+            document.getElementById('totalStaked').textContent = totalStaked.toFixed(2) + ' USDC';
+            document.getElementById('currentEarnings').textContent = totalEarnings.toFixed(2) + ' USDC';
+            document.getElementById('expectedReturn').textContent = totalExpectedReturn.toFixed(2) + ' USDC';
+        }
+
+        // Stake USDC
+        async function stakeUSDC() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            
+            if (isNaN(amount) || amount < 1) {
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Please enter a valid amount (minimum 1 USDC)';
+                return;
+            }
+            
+            if (!lastTransactionSignature) {
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Please confirm you\'ve sent USDC to vault first';
+                return;
+            }
+            
+            try {
+                walletStatusEl.className = 'alert alert-info';
+                walletStatusEl.textContent = 'Creating staking record...';
+                
+                // Create staking record
+                const response = await fetch(`${apiBaseUrl}/staking`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        walletAddress,
+                        amount,
+                        transactionHash: lastTransactionSignature
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    walletStatusEl.className = 'alert alert-success';
+                    walletStatusEl.textContent = 'Success: Staking created successfully!';
+                    loadStakings();
+                    document.getElementById('amount').value = '';
+                    document.getElementById('stakeBtn').disabled = true;
+                    lastTransactionSignature = null;
+                } else {
+                    walletStatusEl.className = 'alert alert-danger';
+                    walletStatusEl.textContent = 'Error: ' + (result.message || 'Failed to create staking');
+                }
+            } catch (err) {
+                console.error("Error staking USDC:", err);
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Failed to stake USDC. Please try again.';
+            }
+        }
+
+        // Withdraw staking
+        async function withdrawStaking(stakingId) {
+            if (!confirm('Are you sure you want to withdraw this staking? You will not receive any interest.')) {
+                return;
+            }
+            
+            try {
+                walletStatusEl.className = 'alert alert-info';
+                walletStatusEl.textContent = 'Processing withdrawal...';
+                
+                // In a real application, you would verify the transaction on-chain
+                // For this demo, we'll simulate a transaction hash
+                const transactionHash = 'withdraw_tx_' + Date.now();
+                
+                const response = await fetch(`${apiBaseUrl}/staking/withdraw`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        stakingId,
+                        walletAddress,
+                        transactionHash
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    walletStatusEl.className = 'alert alert-success';
+                    walletStatusEl.textContent = 'Success: Staking withdrawn successfully!';
+                    loadStakings();
+                } else {
+                    walletStatusEl.className = 'alert alert-danger';
+                    walletStatusEl.textContent = 'Error: ' + (result.message || 'Failed to withdraw staking');
+                }
+            } catch (err) {
+                console.error("Error withdrawing staking:", err);
+                walletStatusEl.className = 'alert alert-danger';
+                walletStatusEl.textContent = 'Error: Failed to withdraw staking. Please try again.';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
+        document.getElementById('openPhantomBtn').addEventListener('click', openPhantomWallet);
+        document.getElementById('sendUSDCBtn').addEventListener('click', confirmUSDCSent);
+        document.getElementById('stakeBtn').addEventListener('click', stakeUSDC);
+        
+        // Check wallet connection on page load
+        document.addEventListener('DOMContentLoaded', checkWalletConnection);
+    </script>
+</body>
+</html> 
