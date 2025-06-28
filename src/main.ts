@@ -4,14 +4,26 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 const isApi = Boolean(Number(process.env.IS_API || 0));
 
 const PORT = process.env.PORT || '3000';
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // logger: false,
     // bufferLogs: true,
+  });
+
+  // Setup static file serving for frontend
+  app.useStaticAssets(join(__dirname, '..', 'public'));
+  app.setBaseViewsDir(join(__dirname, '..', 'views'));
+  app.setViewEngine('hbs');
+  
+  // Set global API prefix but exclude frontend routes
+  app.setGlobalPrefix('api', {
+    exclude: ['/', '/dashboard'],
   });
 
   if (isApi) {
@@ -31,7 +43,7 @@ async function bootstrap() {
 
     if (process.env.APP_ENV !== 'production') {
       const options = new DocumentBuilder()
-        .setTitle('API docs')
+        .setTitle('Investment API docs')
         // .setVersion(DEFAULT_API_VERSION)
         .addBearerAuth()
         .build();

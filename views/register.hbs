@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Register for Lynx Capital - A modern investment platform for Solana">
+    <title>Register - Lynx Capital</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <!-- Offline Indicator -->
+    <div class="offline-indicator">
+        <i class="fas fa-wifi"></i> You are currently offline
+    </div>
+
+    <!-- Auth Container -->
+    <div class="auth-container">
+        <div class="auth-card slide-up">
+            <div class="auth-header">
+                <img src="/assets/icons/icon-192x192.png" alt="Lynx Capital Logo" class="auth-logo">
+                <h1 class="auth-title">Create Account</h1>
+                <p class="auth-subtitle">Join Lynx Capital and start investing</p>
+            </div>
+            
+            <div class="auth-body">
+                <div id="registerAlert" class="alert alert-error mb-4" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <div>
+                        <h4 class="mb-1">Registration Failed</h4>
+                        <p id="registerErrorMessage" class="mb-0">Please check your information and try again.</p>
+                    </div>
+                </div>
+                
+                <form id="registerForm" class="mb-4">
+                    <div class="form-group">
+                        <label class="form-label" for="name">Full Name</label>
+                        <input type="text" id="name" class="form-input" placeholder="John Doe" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email Address</label>
+                        <input type="email" id="email" class="form-input" placeholder="you@example.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="password">Password</label>
+                        <input type="password" id="password" class="form-input" placeholder="••••••••" required minlength="8">
+                        <div class="text-sm mt-1 text-gray-500">Password must be at least 8 characters</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" class="form-input" placeholder="••••••••" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="referralCode">Referral Code</label>
+                        <input type="text" id="referralCode" class="form-input" placeholder="Enter referral code" required>
+                        <div class="text-sm mt-1 text-gray-500">Referral code is required to register</div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 mb-4">
+                        <input type="checkbox" id="terms" class="rounded" required>
+                        <label for="terms">I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-full">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </button>
+                </form>
+            </div>
+            
+            <div class="auth-footer">
+                <p>Already have an account? <a href="/login">Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA Install Banner -->
+    <div class="pwa-install-banner" id="pwaInstallBanner">
+        <div class="pwa-install-content">
+            <img src="/assets/icons/icon-192x192.png" alt="Lynx Capital" class="pwa-install-icon">
+            <div class="pwa-install-text">
+                <h3>Install Lynx Capital</h3>
+                <p>Add to your home screen for better experience</p>
+            </div>
+        </div>
+        <div class="pwa-install-actions">
+            <button id="pwaInstallBtn" class="btn btn-primary">
+                <i class="fas fa-download"></i> Install
+            </button>
+            <button id="pwaDismissBtn" class="btn btn-ghost">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/session.js"></script>
+    <script src="/js/pwa.js"></script>
+    <script src="/js/register.js"></script>
+</body>
+</html> 

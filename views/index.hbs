@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Lynx Capital - A modern investment platform for Solana">
+    <title>Lynx Capital - Investment Platform</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <!-- Offline Indicator -->
+    <div class="offline-indicator">
+        <i class="fas fa-wifi"></i> You are currently offline
+    </div>
+
+    <!-- Auth Container -->
+    <div class="auth-container">
+        <div class="auth-card fade-in">
+            <div class="auth-header">
+                <img src="/assets/icons/icon-192x192.png" alt="Lynx Capital Logo" class="auth-logo">
+                <h1 class="auth-title">Lynx Capital</h1>
+                <p class="auth-subtitle">Modern Investment Platform for Solana</p>
+            </div>
+            
+            <div class="auth-body">
+                <div class="mb-4">
+                    <h2 class="text-center mb-3">Welcome</h2>
+                    <p class="text-center mb-4">Choose how you want to continue</p>
+                </div>
+                
+                <div class="flex flex-col gap-3 mb-4">
+                    <a href="/login" class="btn btn-primary btn-lg">
+                        <i class="fas fa-user"></i>
+                        Login
+                    </a>
+                    
+                    <a href="/register" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-user-plus"></i>
+                        Create Account
+                    </a>
+                </div>
+                
+                <div class="mt-4">
+                    <div class="card p-3">
+                        <h3 class="text-center mb-2">Why Choose Lynx Capital?</h3>
+                        <ul class="mb-0">
+                            <li class="mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle text-success-600"></i>
+                                <span>Secure Solana investments</span>
+                            </li>
+                            <li class="mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle text-success-600"></i>
+                                <span>Competitive interest rates</span>
+                            </li>
+                            <li class="mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle text-success-600"></i>
+                                <span>Easy withdrawal anytime</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i class="fas fa-check-circle text-success-600"></i>
+                                <span>Mobile-friendly platform</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="auth-footer">
+                <p>© 2023 Lynx Capital. All rights reserved.</p>
+                <p class="mt-1">
+                    <a href="#" class="text-sm">Terms of Service</a> • 
+                    <a href="#" class="text-sm">Privacy Policy</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PWA Install Banner -->
+    <div class="pwa-install-banner" id="pwaInstallBanner">
+        <div class="pwa-install-content">
+            <img src="/assets/icons/icon-192x192.png" alt="Lynx Capital" class="pwa-install-icon">
+            <div class="pwa-install-text">
+                <h3>Install Lynx Capital</h3>
+                <p>Add to your home screen for better experience</p>
+            </div>
+        </div>
+        <div class="pwa-install-actions">
+            <button id="pwaInstallBtn" class="btn btn-primary">
+                <i class="fas fa-download"></i> Install
+            </button>
+            <button id="pwaDismissBtn" class="btn btn-ghost">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="/js/pwa.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html> 

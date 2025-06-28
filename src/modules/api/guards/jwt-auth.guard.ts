@@ -12,54 +12,55 @@
 // import { JwtService } from '@nestjs/jwt';
 // import { Request } from 'express';
 
-// @Injectable()
-// export class JwtAuthGuard implements CanActivate {
-//   @Inject(UserRepository)
-//   private userRepository: UserRepository;
-//   constructor(
-//     private jwtService: JwtService,
-//     private configService: ConfigService,
-//   ) {}
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { JwtService } from '@nestjs/jwt';
+import { ExecutionContext } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '@/database/entities/user.entity';
 
-//   async canActivate(context: ExecutionContext): Promise<boolean> {
-//     const request = context.switchToHttp().getRequest();
-//     const token = this.extractTokenFromHeader(request);
-    
-//     // Chỉ bypass kiểm tra token cho endpoint /blogs
-//     if (
-//       process.env.APP_ENV === 'local'
-//     ) {
-//       return true;
-//     }
-    
-//     if (token) {
-//       try {
-//         const payload: TJWTPayload = await this.jwtService.verifyAsync(token, {
-//           secret: this.configService.get<string>('JWT_SECRET'),
-//         });
-//         if (
-//           !(await this.userRepository.exists({ where: { id: payload.sub } }))
-//         ) {
-//           throw {
-//             status_code: HttpStatus.UNAUTHORIZED,
-//             message: `Not found user`,
-//           };
-//         }
-//         request['user'] = { ...payload };
-//       } catch (err) {
-//         throw new UnauthorizedException({
-//           status_code: HttpStatus.UNAUTHORIZED,
-//           ...err,
-//         });
-//       }
-//       return true;
-//     } else {
-//       throw new UnauthorizedException('Unauthorized');
-//     }
-//   }
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  constructor(
+    private jwtService: JwtService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>
+  ) {
+    super();
+  }
 
-//   private extractTokenFromHeader(request: Request): string | undefined {
-//     const [type, token] = request.headers.authorization?.split(' ') ?? [];
-//     return type === 'Bearer' ? token : undefined;
-//   }
-// }
+  async canActivate(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    const token = this.extractTokenFromHeader(request);
+    
+    if (!token) {
+      throw new UnauthorizedException('No token provided');
+    }
+
+    try {
+      const payload = this.jwtService.verify(token);
+      
+      // Fetch the user from database using the ID from token
+      const user = await this.userRepository.findOne({ 
+        where: { id: payload.sub } 
+      });
+      
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+      
+      // Set the full user object to the request
+      request.user = user;
+      return true;
+    } catch (error) {
+      console.log('🔴 [JwtAuthGuard] [canActivate] error:', error.message);
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
+
+  private extractTokenFromHeader(request: any): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
+  }
+}

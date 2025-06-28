@@ -3,14 +3,24 @@ import { configDb } from './configs';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminConfigRepository } from './repositories';
-import { AdminConfigEntity } from './entities/admin-config.entity';
+import { 
+  AdminConfigEntity, 
+  User, 
+  Investment, 
+  WithdrawalRequest 
+} from './entities';
 import { SeedDatabase } from './seeders/seed.database';
 
 const repositories = [AdminConfigRepository];
 
 const services = [];
 
-const entities = [AdminConfigEntity];
+const entities = [
+  AdminConfigEntity, 
+  User, 
+  Investment, 
+  WithdrawalRequest
+];
 
 @Module({
   imports: [
@@ -27,6 +37,6 @@ const entities = [AdminConfigEntity];
   ],
   controllers: [],
   providers: [...repositories, ...services, SeedDatabase],
-  exports: [...repositories, ...services],
+  exports: [...repositories, ...services, TypeOrmModule],
 })
 export class DatabaseModule {}

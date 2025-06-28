@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Lynx Capital - A modern investment platform for Solana">
+    <title>Dashboard - Lynx Capital</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <!-- Offline Indicator -->
+    <div class="offline-indicator">
+        <i class="fas fa-wifi"></i> You are currently offline
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <img src="/assets/icons/icon-192x192.png" alt="Lynx Capital" width="32" height="32">
+            <span>Lynx Capital</span>
+        </div>
+        <div class="navbar-nav">
+            <div class="dropdown" id="userDropdown">
+                <button class="btn btn-ghost btn-icon">
+                    <div class="avatar avatar-sm" id="userAvatar">
+                        <span id="userInitials">U</span>
+                    </div>
+                </button>
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">
+                        <i class="fas fa-user"></i>
+                        <span id="userName">User</span>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <a href="#" class="dropdown-item" id="connectWalletBtn">
+                        <i class="fas fa-wallet"></i>
+                        <span>Connect Wallet</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="settingsBtn">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="#" class="dropdown-item" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <div class="page-header">
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-description">Overview of your investments and earnings</p>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard">
+            <!-- Wallet Card -->
+            <div class="card wallet-card dashboard-card">
+                <div class="card-header wallet-header">
+                    <h2 class="wallet-title">Your Wallet</h2>
+                    <div class="wallet-connection-status" id="walletConnectionStatus">
+                        <span class="badge badge-warning" id="walletDisconnected">Disconnected</span>
+                        <span class="badge badge-success" id="walletConnected" style="display: none;">Connected</span>
+                    </div>
+                </div>
+                <div class="card-body wallet-body">
+                    <div class="wallet-balance" id="walletBalance">0.00 SOL</div>
+                    <div class="wallet-address" id="walletAddress">Not connected</div>
+                    <div class="wallet-actions">
+                        <button class="wallet-action-btn" id="connectBtn">
+                            <i class="fas fa-link"></i> Connect
+                        </button>
+                        <button class="wallet-action-btn" id="copyAddressBtn">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Invested Card -->
+            <div class="card dashboard-card stat-card">
+                <div class="card-body">
+                    <div class="stat-header">
+                        <div class="stat-title">Total Invested</div>
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                    <div class="stat-value" id="totalInvested">0.00 SOL</div>
+                    <div class="stat-description">
+                        <div class="stat-trend trend-up" id="investmentTrend">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>0.00%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Earnings Card -->
+            <div class="card dashboard-card stat-card">
+                <div class="card-body">
+                    <div class="stat-header">
+                        <div class="stat-title">Total Earnings</div>
+                        <div class="stat-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                    </div>
+                    <div class="stat-value" id="totalEarnings">0.00 SOL</div>
+                    <div class="stat-description">
+                        <div class="stat-trend trend-up" id="earningsTrend">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>0.00% this month</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h3>Quick Actions</h3>
+                </div>
+                <div class="card-body">
+                    <div class="flex flex-col gap-3">
+                        <button class="btn btn-primary w-full" id="investBtn">
+                            <i class="fas fa-plus"></i> Invest Now
+                        </button>
+                        <button class="btn btn-secondary w-full" id="withdrawBtn">
+                            <i class="fas fa-arrow-up"></i> Withdraw
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Investments -->
+            <div class="card dashboard-card" style="grid-column: span 2;">
+                <div class="card-header">
+                    <h3>Recent Investments</h3>
+                    <a href="#" class="btn btn-ghost btn-sm">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="investment-list" id="investmentList">
+                        <div class="empty-state text-center p-4" id="emptyInvestments">
+                            <i class="fas fa-chart-bar text-gray-400" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                            <p>No investments yet. Start investing to see your activity here!</p>
+                        </div>
+                        <!-- Investment items will be added dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h3>Recent Activity</h3>
+                    <a href="#" class="btn btn-ghost btn-sm">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="activity-list" id="activityList">
+                        <div class="empty-state text-center p-4" id="emptyActivity">
+                            <i class="fas fa-history text-gray-400" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                            <p>No activity yet. Your recent actions will appear here.</p>
+                        </div>
+                        <!-- Activity items will be added dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Investment Modal -->
+    <div class="modal-backdrop" id="investModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Make Investment</h3>
+                <button class="modal-close" id="closeInvestModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <div class="card mb-3">
+                        <div class="card-body p-3">
+                            <div class="flex justify-between mb-2">
+                                <span>Annual Return:</span>
+                                <strong>30%</strong>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span>Investment Term:</span>
+                                <strong>1 Year</strong>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span>Minimum Investment:</span>
+                                <strong>0.1 SOL</strong>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>System Wallet:</span>
+                                <strong class="text-primary-600" id="systemWalletAddress">Loading...</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <form id="investForm">
+                        <div class="form-group">
+                            <label class="form-label" for="investAmount">Investment Amount (SOL)</label>
+                            <input type="number" id="investAmount" class="form-input" min="0.1" step="0.01" required>
+                            <div class="text-sm mt-1 text-gray-500">Minimum: 0.1 SOL</div>
+                        </div>
+                        
+                        <div class="card p-3 mt-4 mb-4">
+                            <h4 class="mb-2">Investment Projection</h4>
+                            <div class="flex justify-between mb-2">
+                                <span>Principal:</span>
+                                <span id="projectionPrincipal">0.00 SOL</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span>Interest (30%):</span>
+                                <span id="projectionInterest">0.00 SOL</span>
+                            </div>
+                            <div class="flex justify-between font-semibold">
+                                <span>Total After 1 Year:</span>
+                                <span id="projectionTotal">0.00 SOL</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelInvestBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmInvestBtn">
+                    <i class="fas fa-paper-plane"></i> Send SOL & Invest
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Withdraw Modal -->
+    <div class="modal-backdrop" id="withdrawModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Withdraw Funds</h3>
+                <button class="modal-close" id="closeWithdrawModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <div class="card mb-3">
+                        <div class="card-body p-3">
+                            <div class="flex justify-between mb-2">
+                                <span>Available Balance:</span>
+                                <strong id="availableBalance">0.00 SOL</strong>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Processing Time:</span>
+                                <strong>24 Hours</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <form id="withdrawForm">
+                        <div class="form-group">
+                            <label class="form-label" for="withdrawAmount">Withdrawal Amount (SOL)</label>
+                            <input type="number" id="withdrawAmount" class="form-input" min="0.01" step="0.01" required>
+                            <div class="text-sm mt-1 text-gray-500">Will be processed within 24 hours</div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelWithdrawBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmWithdrawBtn">
+                    <i class="fas fa-clock"></i> Request Withdrawal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/js/session.js"></script>
+    <script src="/js/phantom.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/pwa.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html> 
