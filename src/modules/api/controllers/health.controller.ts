@@ -47,7 +47,8 @@ export class HealthController {
     description: 'Database connection failed',
   })
   async checkDB() {
-    return await this.adminConfigRepository.findOne({ where: {} });
+    const result = await this.adminConfigRepository.findOne({ where: {} });
+    return result || { status: 'Database connected, but no admin config found' };
   }
 
   @Get('throw')
