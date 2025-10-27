@@ -19,6 +19,8 @@ async function bootstrap() {
     //   'http://localhost:3000',
     // ];
 
+    app.setGlobalPrefix('v1');
+
     app.enableCors({
       // allowedHeaders: ['content-type'],
       origin: '*',
