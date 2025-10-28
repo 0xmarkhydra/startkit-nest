@@ -10,8 +10,18 @@ Wallet Server uses **API Key authentication** stored in the `admin_configs` tabl
 
 ### Default API Key
 
-Khi chạy server lần đầu, một API key mặc định sẽ được tự động tạo:
+Khi chạy server lần đầu, một API key mặc định sẽ được tự động tạo.
 
+**Cách 1: Sử dụng custom key (Khuyến nghị)**
+
+Thêm vào `.env`:
+```bash
+DEFAULT_API_KEY=your-custom-key-here
+```
+
+**Cách 2: Sử dụng hardcoded key (Development only)**
+
+Nếu không set `DEFAULT_API_KEY` trong `.env`, sẽ dùng key mặc định:
 ```
 wsk_dev_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd
 ```

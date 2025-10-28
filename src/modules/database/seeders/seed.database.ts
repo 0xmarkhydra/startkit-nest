@@ -42,8 +42,11 @@ export class SeedDatabase implements OnApplicationBootstrap {
       return;
     }
 
-    // Create default API key for development
-    const defaultApiKey = 'wsk_dev_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd';
+    // Get default API key from environment or use hardcoded fallback
+    const defaultApiKey = process.env.DEFAULT_API_KEY || 
+      'wsk_dev_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd';
+    
+    const isCustomKey = !!process.env.DEFAULT_API_KEY;
     
     const apiKeysData = [
       {
@@ -71,12 +74,19 @@ export class SeedDatabase implements OnApplicationBootstrap {
 
     console.log('');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔑 DEFAULT API KEY (For Development/Testing Only)');
+    if (isCustomKey) {
+      console.log('🔑 DEFAULT API KEY (From Environment Variable)');
+    } else {
+      console.log('🔑 DEFAULT API KEY (For Development/Testing Only)');
+    }
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`   ${defaultApiKey}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('');
-    console.log('⚠️  WARNING: This is a default key for development only!');
+    if (!isCustomKey) {
+      console.log('⚠️  WARNING: Using hardcoded default key for development only!');
+      console.log('    To use custom key, set DEFAULT_API_KEY in .env file');
+    }
     console.log('    For production, generate secure keys using:');
     console.log('    cd scripts && pnpm run generate-api-key');
     console.log('');

@@ -65,6 +65,9 @@ DB_SYNC=1  # Tự động tạo tables
 MASTER_KEY=my-development-master-key-change-in-production
 IP_WHITELIST=127.0.0.1,::1
 
+# API Key (optional - để trống sẽ dùng default key)
+DEFAULT_API_KEY=
+
 # Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
