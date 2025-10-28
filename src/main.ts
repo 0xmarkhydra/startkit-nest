@@ -33,8 +33,18 @@ async function bootstrap() {
 
     if (process.env.APP_ENV !== 'production') {
       const options = new DocumentBuilder()
-        .setTitle('API docs')
+        .setTitle('Wallet Server API')
+        .setDescription('Internal API for managing EVM wallets and private keys')
         // .setVersion(DEFAULT_API_VERSION)
+        .addApiKey(
+          {
+            type: 'apiKey',
+            name: 'X-API-Key',
+            in: 'header',
+            description: 'API Key for authentication',
+          },
+          'X-API-Key',
+        )
         .addBearerAuth()
         .build();
       const document = SwaggerModule.createDocument(app, options);

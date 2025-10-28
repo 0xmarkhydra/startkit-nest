@@ -1,4 +1,4 @@
-import { Entity, Column, Index } from 'typeorm';
+import { Entity, Column, Index, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { BaseEntity } from './base.entity';
 
 @Entity('user_wallets')
@@ -23,5 +23,25 @@ export class UserWalletEntity extends BaseEntity {
 
   @Column({ default: 'aes_gcm' })
   custodian: string;
+
+  /**
+   * Normalize address to lowercase before insert
+   */
+  @BeforeInsert()
+  normalizeAddressBeforeInsert() {
+    if (this.address) {
+      this.address = this.address.toLowerCase();
+    }
+  }
+
+  /**
+   * Normalize address to lowercase before update
+   */
+  @BeforeUpdate()
+  normalizeAddressBeforeUpdate() {
+    if (this.address) {
+      this.address = this.address.toLowerCase();
+    }
+  }
 }
 

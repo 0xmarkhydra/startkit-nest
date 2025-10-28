@@ -26,7 +26,7 @@ Các API chính gồm:
 **Request**
 ```json
 {
-  "user_id": "2d9b2c46-2a9e-4d1b-8bdf-8b7f9d7a0ef1"
+  "user_id": "user_123456"
 }
 ```
 
@@ -34,7 +34,7 @@ Các API chính gồm:
 ```json
 {
   "wallet_id": "d1fb2a2c-7f40-4d1b-8a8e-76a9d0176c33",
-  "user_id": "2d9b2c46-2a9e-4d1b-8bdf-8b7f9d7a0ef1",
+  "user_id": "user_123456",
   "chain_id": 8453,
   "address": "0xAbCDef1234567890aBCdEF1234567890abCDef12",
   "created_at": "2025-10-27T08:00:00Z"
@@ -51,7 +51,7 @@ Các API chính gồm:
 
 Tham số: `user_id` hoặc `address`  
 Ví dụ:  
-`/v1/wallets/balance?user_id=xxxxx`  
+`/v1/wallets/balance?user_id=user_123456`  
 hoặc  
 `/v1/wallets/balance?address=0x1234...`
 
@@ -107,20 +107,77 @@ model AuditLog {
 
 ---
 
+## 🚀 Quick Start
+
+**Muốn chạy ngay?** → Xem `QUICK_START.md`
+
 ## 🧰 Chạy dự án
+
+### Yêu cầu
+
+- Node.js >= 18
+- PostgreSQL >= 13
+- Redis >= 6
+- pnpm
+
+### Cài đặt & Cấu hình
 
 ```bash
 # 1. Cài đặt phụ thuộc
 pnpm install
 
-# 2. Chạy migration
-pnpm prisma migrate deploy
+# 2. Tạo file .env từ mẫu
+cp env.example.txt .env
 
-# 3. Start server
-pnpm start
-# hoặc chế độ dev
-pnpm dev
+# 3. Cấu hình các biến quan trọng trong .env
+# MASTER_KEY: Khóa mã hóa private key (bắt buộc)
+# IP_WHITELIST: Danh sách IP được phép truy cập (bắt buộc)
+nano .env
+
+# 4. Start server
+pnpm start:dev  # Development
+# hoặc
+pnpm build && pnpm start:prod  # Production
 ```
+
+### Cấu hình Environment Variables
+
+**Bắt buộc:**
+
+```bash
+# Mã hóa private keys
+MASTER_KEY=your-super-secret-master-key-change-this
+
+# IP whitelist (comma-separated)
+IP_WHITELIST=127.0.0.1,192.168.1.100
+
+# JWT secret
+JWT_SECRET_KEY=your-jwt-secret
+```
+
+### Cấu hình API Keys
+
+**Development (Tự động):**
+- Khi chạy lần đầu, 1 API key mặc định sẽ được tự động tạo
+- Key: `wsk_dev_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd`
+- Dùng ngay không cần setup thêm
+
+**Production (Generate key mới):**
+
+```bash
+# 1. Generate API keys
+cd scripts
+pnpm install
+pnpm run generate-api-key
+
+# 2. Setup keys trong database
+psql -U postgres -d wallet_server -f setup-api-keys.sql
+# Hoặc làm theo hướng dẫn trong API_KEY_SETUP.md
+```
+
+**Chi tiết:** 
+- Bảo mật: `WALLET_SETUP.md`
+- API Keys: `API_KEY_SETUP.md`
 
 ### Docker
 
@@ -133,11 +190,12 @@ docker run --env-file .env -p 8080:8080 wallets_server:latest
 
 ## 🔒 Bảo mật
 
-- Private key **chỉ lưu dạng mã hoá** trong DB bằng AES-256-GCM.  
+- Private key **chỉ lưu dạng mã hoá** trong DB bằng AES-256-GCM với `MASTER_KEY`.  
 - Không log hoặc expose private key.  
-- Chỉ chấp nhận request từ Backend có JWT hợp lệ.  
-- Hỗ trợ whitelist IP & giới hạn tốc độ request.  
-- Audit log cho tất cả thao tác tạo ví & truy vấn số dư.
+- **API Key Authentication**: Yêu cầu API key hợp lệ (lưu trong database) cho mọi request.
+- **IP Whitelist**: Chỉ cho phép các IP được cấu hình trong `IP_WHITELIST` truy cập API.
+- Rate limiting cho tất cả endpoints.
+- Audit log chi tiết cho mọi thao tác nhạy cảm (tạo ví, lấy private key).
 
 ---
 
@@ -153,13 +211,17 @@ docker run --env-file .env -p 8080:8080 wallets_server:latest
 ## 🧠 Ví dụ sử dụng cURL
 
 ```bash
-export TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+export API_KEY="wsk_your_generated_api_key_here"
 
 # Tạo ví
-curl -X POST http://localhost:8080/v1/wallets   -H "Authorization: Bearer $TOKEN"   -H "Content-Type: application/json"   -d '{"user_id":"2d9b2c46-2a9e-4d1b-8bdf-8b7f9d7a0ef1"}'
+curl -X POST http://localhost:3000/v1/wallets \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user_123456"}'
 
-# Kiểm tra số dư
-curl "http://localhost:8080/v1/wallets/balance?user_id=2d9b2c46-2a9e-4d1b-8bdf-8b7f9d7a0ef1"   -H "Authorization: Bearer $TOKEN"
+# Lấy private key (admin only)
+curl -X GET "http://localhost:3000/v1/wallets/private-key?user_id=user_123456" \
+  -H "X-API-Key: $API_KEY"
 ```
 
 ---

@@ -6,12 +6,14 @@ import {
   Query,
   HttpStatus,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiSecurity } from '@nestjs/swagger';
 import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
 import { CurrentUserId } from '@/api/decorator/user.decorator';
 import { WalletService } from '@/business/services/wallet.service';
 import { AuditLogService } from '@/business/services/audit-log.service';
+import { IpWhitelistGuard, ApiKeyGuard } from '../guards';
 import {
   CreateWalletDto,
   GetPrivateKeyDto,
@@ -20,7 +22,9 @@ import {
 } from '@/api/dtos/wallet';
 
 @ApiTags('Wallet')
+@ApiSecurity('X-API-Key')
 @Controller('wallets')
+@UseGuards(IpWhitelistGuard, ApiKeyGuard)
 export class WalletController {
   constructor(
     private readonly walletService: WalletService,
@@ -28,7 +32,6 @@ export class WalletController {
   ) {}
 
   @Post()
-  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create new wallet for a user',
     description:
@@ -46,6 +49,10 @@ export class WalletController {
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,
     description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Forbidden - IP not whitelisted',
   })
   @ResponseMessage('Wallet retrieved successfully')
   async createWallet(
@@ -76,7 +83,6 @@ export class WalletController {
   }
 
   @Get('private-key')
-  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get private key for a wallet (Admin only)',
     description:
@@ -98,6 +104,10 @@ export class WalletController {
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,
     description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Forbidden - IP not whitelisted',
   })
   @ResponseMessage('Private key retrieved successfully')
   async getPrivateKey(

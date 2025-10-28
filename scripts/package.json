@@ -4,7 +4,8 @@
   "description": "Scripts for testing Blink Chat Backend",
   "scripts": {
     "generate-wallet": "ts-node generate-wallet.ts",
-    "test-auth": "ts-node test-auth-api.ts"
+    "test-auth": "ts-node test-auth-api.ts",
+    "generate-api-key": "ts-node generate-api-key.ts"
   },
   "dependencies": {
     "axios": "^1.4.0",

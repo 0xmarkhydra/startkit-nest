@@ -81,15 +81,17 @@ export class WalletService {
    * Get wallet by address
    */
   async getWalletByAddress(address: string): Promise<UserWalletEntity> {
-    console.log(`🔍 [WalletService] [getWalletByAddress] Getting wallet for address: ${address}`);
+    // Normalize address to lowercase for comparison
+    const normalizedAddress = address.toLowerCase();
+    console.log(`🔍 [WalletService] [getWalletByAddress] Getting wallet for address: ${normalizedAddress}`);
     
     const wallet = await this.userWalletRepository.findOne({
-      where: { address },
+      where: { address: normalizedAddress },
     });
     
     if (!wallet) {
-      console.log(`🔴 [WalletService] [getWalletByAddress] Wallet not found for address: ${address}`);
-      throw new NotFoundException(`Wallet not found for address: ${address}`);
+      console.log(`🔴 [WalletService] [getWalletByAddress] Wallet not found for address: ${normalizedAddress}`);
+      throw new NotFoundException(`Wallet not found for address: ${normalizedAddress}`);
     }
     
     console.log(`✅ [WalletService] [getWalletByAddress] Found wallet with userId: ${wallet.userId}`);

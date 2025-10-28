@@ -1,39 +1,16 @@
-export function parseString(str: string) {
-  try {
-    return JSON.parse(str);
-  } catch (error) {
-    return [];
-  }
+/**
+ * Normalize Ethereum address to lowercase
+ * ERC-20 addresses should always be stored and compared in lowercase
+ */
+export function normalizeAddress(address: string): string {
+  if (!address) return address;
+  return address.toLowerCase();
 }
 
-export function chunk<T>(array: T[], chunkSize: number): T[][] {
-  const chunked = [];
-  for (let i = 0; i < array.length; i += chunkSize) {
-    chunked.push(array.slice(i, i + chunkSize));
-  }
-
-  return chunked;
-}
-
-export function generateSlug(input: string) {
-  const words = input?.trim()?.split(' ');
-  // Create a new string starting with "output"
-  let newString = '';
-  // Iterate through each word in the original string
-  for (let i = 0; i < words.length; i++) {
-    if (i === 0) {
-      newString = words[i];
-      continue;
-    }
-    newString += '-' + words[i];
-  }
-  return (
-    newString
-      .toLowerCase()
-      .replace(/[^\w\s]/gi, '-')
-      .replace(/[^a-zA-Z0-9]/g, '-')
-      .replace(/ /g, '-') +
-    '-' +
-    new Date().getTime().toString()
-  );
+/**
+ * Check if two addresses are equal (case-insensitive)
+ */
+export function isAddressEqual(address1: string, address2: string): boolean {
+  if (!address1 || !address2) return false;
+  return normalizeAddress(address1) === normalizeAddress(address2);
 }
