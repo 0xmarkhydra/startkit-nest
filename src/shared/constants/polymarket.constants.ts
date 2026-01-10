@@ -18,8 +18,14 @@ export const MAX_QUEUE_SIZE = 10000; // Maximum queue size to prevent overflow
 
 // Polymarket API URLs
 export const POLYMARKET_WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
+export const POLYMARKET_PRICE_WS_URL = 'wss://ws-live-data.polymarket.com/'; // Chainlink/Binance price feed
 export const POLYMARKET_GAMMA_API_URL = 'https://gamma-api.polymarket.com';
 export const POLYMARKET_CRYPTO_PRICE_API_URL = 'https://polymarket.com/api/crypto/crypto-price';
+
+// Price WebSocket constants
+export const PRICE_PING_INTERVAL = 5000; // 5 seconds - Price WebSocket ping interval
+export const PRICE_BATCH_INTERVAL = 2000; // 2 seconds - Price batch insert interval
+export const PRICE_BATCH_SIZE = 1000; // Price batch size
 
 // Market slug pattern
 export const MARKET_SLUG_PATTERN = 'btc-updown-15m-{timestamp}';

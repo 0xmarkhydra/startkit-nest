@@ -113,18 +113,42 @@ export class PolymarketCryptoPriceService {
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
+      
+      // Check if it's a rate limit error (429)
+      const isRateLimit = axiosError.response?.status === 429;
+      
       if (axiosError.response) {
-        this.logger.error(
-          {
-            symbol,
-            eventStartTime,
-            endDate,
-            status: axiosError.response.status,
-            statusText: axiosError.response.statusText,
-            data: JSON.stringify(axiosError.response.data).substring(0, 500),
-          },
-          '🔴 [PolymarketCryptoPriceService] [fetchCryptoPrice] Error fetching crypto price (axios error)',
-        );
+        if (isRateLimit) {
+          this.logger.warn(
+            {
+              symbol,
+              eventStartTime,
+              endDate,
+              status: axiosError.response.status,
+              statusText: axiosError.response.statusText,
+              data: JSON.stringify(axiosError.response.data).substring(0, 500),
+            },
+            '⚠️ [PolymarketCryptoPriceService] [fetchCryptoPrice] Rate limit error (429) - Chainlink API error 429',
+          );
+        } else {
+          this.logger.error(
+            {
+              symbol,
+              eventStartTime,
+              endDate,
+              status: axiosError.response.status,
+              statusText: axiosError.response.statusText,
+              data: JSON.stringify(axiosError.response.data).substring(0, 500),
+            },
+            '🔴 [PolymarketCryptoPriceService] [fetchCryptoPrice] Error fetching crypto price (axios error)',
+          );
+        }
+        
+        // Throw error with status code for caller to handle
+        const errorWithStatus = new Error(axiosError.message);
+        (errorWithStatus as any).status = axiosError.response.status;
+        (errorWithStatus as any).isRateLimit = isRateLimit;
+        throw errorWithStatus;
       } else {
         this.logger.error(
           {
@@ -135,8 +159,8 @@ export class PolymarketCryptoPriceService {
           },
           '🔴 [PolymarketCryptoPriceService] [fetchCryptoPrice] Error fetching crypto price (network error)',
         );
+        throw axiosError;
       }
-      return null;
     }
   }
 

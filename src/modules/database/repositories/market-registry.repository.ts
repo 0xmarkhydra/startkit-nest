@@ -64,7 +64,8 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
    * Automatically calculates index_15m from start_timestamp if not provided
    */
   async upsertMarket(data: CreateMarketRegistryData): Promise<MarketRegistryEntity> {
-    // Calculate index_15m if not provided
+    // Calculate index_15m from start_timestamp
+    // Always recalculate to ensure consistency (don't use existing.index_15m if it's wrong)
     const index_15m = data.index_15m !== undefined ? data.index_15m : calculateIndex15m(data.start_timestamp);
 
     // Find existing market by slug (including soft-deleted ones)
@@ -79,6 +80,13 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
         await this.restore({ id: existing.id });
       }
 
+      // Always recalculate index_15m from start_timestamp to ensure correctness
+      // This ensures that even if start_timestamp changes, index_15m will be updated
+      // Priority: provided index > recalculated from start_timestamp > existing index
+      const finalIndex_15m = data.index_15m !== undefined && data.index_15m !== null
+        ? data.index_15m
+        : calculateIndex15m(data.start_timestamp) ?? existing.index_15m;
+
       // Update existing market
       Object.assign(existing, {
         condition_id: data.condition_id,
@@ -91,7 +99,7 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
         open_price: data.open_price !== undefined ? data.open_price : existing.open_price,
         close_price: data.close_price !== undefined ? data.close_price : existing.close_price,
         type_win: data.type_win !== undefined ? data.type_win : existing.type_win,
-        index_15m: index_15m !== undefined ? index_15m : existing.index_15m ?? calculateIndex15m(data.start_timestamp),
+        index_15m: finalIndex_15m, // Always update from start_timestamp to prevent duplicates
         deleted_at: null, // Clear soft delete if exists
         updated_at: new Date(),
       });

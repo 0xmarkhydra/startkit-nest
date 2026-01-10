@@ -3,7 +3,11 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Cron } from '@nestjs/schedule';
 import { MarketManagerService } from '@/business/services/market-manager.service';
 import { PolymarketWebSocketCollectorService } from '@/business/services/polymarket-websocket-collector.service';
+import { PolymarketPriceWebSocketService } from '@/business/services/polymarket-price-websocket.service';
 import { RawMessageBatchService } from '@/business/services/raw-message-batch.service';
+import { MarketTradeBatchService } from '@/business/services/market-trade-batch.service';
+import { MarketPriceChangeBatchService } from '@/business/services/market-price-change-batch.service';
+import { BtcChainlinkPriceBatchService } from '@/business/services/btc-chainlink-price-batch.service';
 import { WsRawMessageRepository } from '@/database/repositories/ws-raw-message.repository';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -18,7 +22,11 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
   constructor(
     private readonly marketManager: MarketManagerService,
     private readonly wsCollector: PolymarketWebSocketCollectorService,
+    private readonly priceWsService: PolymarketPriceWebSocketService,
     private readonly batchService: RawMessageBatchService,
+    private readonly tradeBatchService: MarketTradeBatchService,
+    private readonly priceChangeBatchService: MarketPriceChangeBatchService,
+    private readonly priceBatchService: BtcChainlinkPriceBatchService,
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectPinoLogger(PolymarketCollectorScheduler.name) private readonly logger: PinoLogger,
   ) {
@@ -40,13 +48,17 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
     try {
       this.logger.info('🔄 [PolymarketCollectorScheduler] [onModuleInit] Initializing Polymarket collector');
 
+      // Connect to Price WebSocket (Chainlink BTC/USD price feed)
+      await this.priceWsService.connect();
+      this.logger.info('✅ [PolymarketCollectorScheduler] [onModuleInit] Price WebSocket connected');
+
       // Initialize market manager (this will connect WebSocket, fetch markets, subscribe, and start monitoring)
       await this.marketManager.initialize();
 
       this.logger.info('✅ [PolymarketCollectorScheduler] [onModuleInit] Polymarket collector initialized successfully');
     } catch (error) {
       this.logger.error(
-        { error: error.message },
+        { error: error instanceof Error ? error.message : String(error) },
         '🔴 [PolymarketCollectorScheduler] [onModuleInit] Failed to initialize collector',
       );
       // Don't throw - let the application continue running, will retry in next cycle
@@ -67,16 +79,22 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
       // Stop market manager (stops monitor loop and overlap subscription)
       this.marketManager.stop();
 
-      // Disconnect WebSocket
+      // Disconnect market WebSocket
       await this.wsCollector.disconnect();
 
-      // Flush message queue to ensure no data loss
-      await this.batchService.flushQueue();
+      // Disconnect price WebSocket
+      await this.priceWsService.disconnect();
+
+      // Flush all message queues to ensure no data loss
+      await this.batchService.flushQueue(); // Raw messages
+      await this.tradeBatchService.flushQueue(); // Market trades
+      await this.priceChangeBatchService.flushQueue(); // Market price changes
+      await this.priceBatchService.flushQueue(); // BTC Chainlink prices
 
       this.logger.info('✅ [PolymarketCollectorScheduler] [onModuleDestroy] Polymarket collector shutdown completed');
     } catch (error) {
       this.logger.error(
-        { error: error.message },
+        { error: error instanceof Error ? error.message : String(error) },
         '🔴 [PolymarketCollectorScheduler] [onModuleDestroy] Error during shutdown',
       );
     }

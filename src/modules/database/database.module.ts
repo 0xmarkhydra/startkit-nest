@@ -6,11 +6,17 @@ import {
   AdminConfigRepository,
   WsRawMessageRepository,
   MarketRegistryRepository,
+  MarketTradeRepository,
+  MarketPriceChangeRepository,
+  BtcChainlinkPriceRepository,
 } from './repositories';
 import {
   AdminConfigEntity,
   WsRawMessageEntity,
   MarketRegistryEntity,
+  MarketTradeEntity,
+  MarketPriceChangeEntity,
+  BtcChainlinkPriceEntity,
 } from './entities';
 import { SeedDatabase } from './seeders/seed.database';
 
@@ -18,6 +24,9 @@ const repositories = [
   AdminConfigRepository,
   WsRawMessageRepository,
   MarketRegistryRepository,
+  MarketTradeRepository,
+  MarketPriceChangeRepository,
+  BtcChainlinkPriceRepository,
 ];
 
 const services = [];
@@ -26,6 +35,9 @@ const entities = [
   AdminConfigEntity,
   WsRawMessageEntity,
   MarketRegistryEntity,
+  MarketTradeEntity,
+  MarketPriceChangeEntity,
+  BtcChainlinkPriceEntity,
 ];
 
 @Module({
