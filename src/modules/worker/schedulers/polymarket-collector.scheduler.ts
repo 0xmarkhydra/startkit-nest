@@ -118,5 +118,33 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
       );
     }
   }
+
+  /**
+   * Retry fetching closePrice for ended markets missing close_price
+   * Runs every 1 minute to fill in missing data
+   * Finds markets with status = 'ended' and close_price = null
+   */
+  @Cron('* * * * *', {
+    name: 'retry-ended-markets-close-price',
+    timeZone: 'UTC',
+  })
+  async retryEndedMarketsClosePrice(): Promise<void> {
+    if (!this.isWorker) {
+      return;
+    }
+
+    try {
+      this.logger.debug('🔄 [PolymarketCollectorScheduler] [retryEndedMarketsClosePrice] Starting retry for ended markets missing closePrice');
+
+      await this.marketManager.retryFetchClosePriceForEndedMarkets();
+
+      this.logger.debug('✅ [PolymarketCollectorScheduler] [retryEndedMarketsClosePrice] Completed retry for ended markets');
+    } catch (error) {
+      this.logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        '🔴 [PolymarketCollectorScheduler] [retryEndedMarketsClosePrice] Error during retry',
+      );
+    }
+  }
 }
 

@@ -42,5 +42,9 @@ export class MarketRegistryEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 10, nullable: true })
   type_win: 'UP' | 'DOWN' | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @Index('idx_market_index_15m')
+  index_15m: number | null; // Index of 15-minute market in a day (1-96, 96 markets per day, starts from 1)
 }
 

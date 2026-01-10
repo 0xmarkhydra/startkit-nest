@@ -489,155 +489,298 @@ export class MarketManagerService implements OnModuleDestroy {
 
   /**
    * Fetch and save openPrice when market starts (becomes ACTIVE)
+   * Retry 10 times with 5 seconds delay between retries
    */
   private async fetchAndSaveOpenPrice(market: MarketData): Promise<void> {
-    try {
-      // Check if market already has openPrice
-      const existingMarket = await this.marketRegistry.findBySlug(market.slug);
-      if (existingMarket && existingMarket.open_price !== null) {
+    const MAX_RETRIES = 10;
+    const RETRY_DELAY_MS = 5000; // 5 seconds
+
+    // Check if market already has openPrice
+    const existingMarket = await this.marketRegistry.findBySlug(market.slug);
+    if (existingMarket && existingMarket.open_price !== null) {
+      this.logger.info(
+        {
+          slug: market.slug,
+          existingOpenPrice: existingMarket.open_price,
+          startTimestamp: market.startTimestamp,
+          endTimestamp: market.endTimestamp,
+        },
+        '💰 [MarketManagerService] [fetchAndSaveOpenPrice] Market already has openPrice, skipping',
+      );
+      return;
+    }
+
+    // Extract timestamp from slug để đảm bảo consistency với slug pattern
+    // Slug format: "btc-updown-15m-{timestamp}" - timestamp này là start timestamp thực tế
+    const slugStartTimestamp = this.extractTimestampFromSlug(market.slug);
+    const slugEndTimestamp = slugStartTimestamp ? slugStartTimestamp + MARKET_DURATION : market.endTimestamp;
+    
+    // Use timestamp from slug nếu có, fallback to Gamma API timestamps
+    const startTimestamp = slugStartTimestamp || market.startTimestamp;
+    const endTimestamp = slugEndTimestamp || market.endTimestamp;
+
+    this.logger.info(
+      {
+        slug: market.slug,
+        slugStartTimestamp,
+        slugEndTimestamp,
+        gammaStartTimestamp: market.startTimestamp,
+        gammaEndTimestamp: market.endTimestamp,
+        usingStartTimestamp: startTimestamp,
+        usingEndTimestamp: endTimestamp,
+        startDate: new Date(startTimestamp * 1000).toISOString(),
+        endDate: new Date(endTimestamp * 1000).toISOString(),
+        maxRetries: MAX_RETRIES,
+        retryDelaySeconds: RETRY_DELAY_MS / 1000,
+      },
+      '💰 [MarketManagerService] [fetchAndSaveOpenPrice] Fetching openPrice for market (with retry)',
+    );
+
+    // Retry logic: retry 10 times, wait 5 seconds between retries
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const priceData = await this.cryptoPriceService.fetchCryptoPriceByMarket(
+          market.slug,
+          startTimestamp,
+          endTimestamp,
+        );
+
+        if (!priceData) {
+          if (attempt < MAX_RETRIES) {
+            this.logger.warn(
+              { slug: market.slug, attempt, maxRetries: MAX_RETRIES, nextRetryInSeconds: RETRY_DELAY_MS / 1000 },
+              `⚠️ [MarketManagerService] [fetchAndSaveOpenPrice] Failed to fetch crypto price (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_DELAY_MS / 1000}s...`,
+            );
+            // Wait 5 seconds before retry
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+            continue;
+          } else {
+            this.logger.error(
+              { slug: market.slug, attempts: MAX_RETRIES },
+              `🔴 [MarketManagerService] [fetchAndSaveOpenPrice] Failed to fetch crypto price after ${MAX_RETRIES} attempts`,
+            );
+            return;
+          }
+        }
+
+        // Save openPrice ONLY (closePrice will be saved when market ends)
+        // Don't save closePrice here even if API returns it - only save when market status is ENDED
+        await this.marketRegistry.updateCryptoPrices(
+          market.slug,
+          priceData.openPrice,
+          undefined, // Don't update closePrice here - only when market ends
+          null, // type_win will be set when market ends
+        );
+
         this.logger.info(
           {
             slug: market.slug,
-            existingOpenPrice: existingMarket.open_price,
-            startTimestamp: market.startTimestamp,
-            endTimestamp: market.endTimestamp,
+            attempt,
+            openPrice: priceData.openPrice,
+            apiReturnedClosePrice: priceData.closePrice,
+            completed: priceData.completed,
           },
-          '💰 [MarketManagerService] [fetchAndSaveOpenPrice] Market already has openPrice, skipping',
+          `✅ [MarketManagerService] [fetchAndSaveOpenPrice] Successfully saved openPrice (attempt ${attempt}/${MAX_RETRIES})`,
         );
-        return;
+        return; // Success, exit retry loop
+      } catch (error) {
+        if (attempt < MAX_RETRIES) {
+          this.logger.warn(
+            {
+              slug: market.slug,
+              attempt,
+              maxRetries: MAX_RETRIES,
+              error: error instanceof Error ? error.message : String(error),
+              nextRetryInSeconds: RETRY_DELAY_MS / 1000,
+            },
+            `⚠️ [MarketManagerService] [fetchAndSaveOpenPrice] Error fetching openPrice (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_DELAY_MS / 1000}s...`,
+          );
+          // Wait 5 seconds before retry
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        } else {
+          this.logger.error(
+            {
+              slug: market.slug,
+              attempts: MAX_RETRIES,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            `🔴 [MarketManagerService] [fetchAndSaveOpenPrice] Error fetching openPrice after ${MAX_RETRIES} attempts`,
+          );
+          return;
+        }
       }
-
-      // Extract timestamp from slug để đảm bảo consistency với slug pattern
-      // Slug format: "btc-updown-15m-{timestamp}" - timestamp này là start timestamp thực tế
-      const slugStartTimestamp = this.extractTimestampFromSlug(market.slug);
-      const slugEndTimestamp = slugStartTimestamp ? slugStartTimestamp + MARKET_DURATION : market.endTimestamp;
-      
-      // Use timestamp from slug nếu có, fallback to Gamma API timestamps
-      const startTimestamp = slugStartTimestamp || market.startTimestamp;
-      const endTimestamp = slugEndTimestamp || market.endTimestamp;
-
-      this.logger.info(
-        {
-          slug: market.slug,
-          slugStartTimestamp,
-          slugEndTimestamp,
-          gammaStartTimestamp: market.startTimestamp,
-          gammaEndTimestamp: market.endTimestamp,
-          usingStartTimestamp: startTimestamp,
-          usingEndTimestamp: endTimestamp,
-          startDate: new Date(startTimestamp * 1000).toISOString(),
-          endDate: new Date(endTimestamp * 1000).toISOString(),
-        },
-        '💰 [MarketManagerService] [fetchAndSaveOpenPrice] Fetching openPrice for market',
-      );
-
-      const priceData = await this.cryptoPriceService.fetchCryptoPriceByMarket(
-        market.slug,
-        startTimestamp,
-        endTimestamp,
-      );
-
-      if (!priceData) {
-        this.logger.warn({ slug: market.slug }, '⚠️ [MarketManagerService] [fetchAndSaveOpenPrice] Failed to fetch crypto price, will retry later');
-        return;
-      }
-
-      // Save openPrice ONLY (closePrice will be saved when market ends)
-      // Don't save closePrice here even if API returns it - only save when market status is ENDED
-      await this.marketRegistry.updateCryptoPrices(
-        market.slug,
-        priceData.openPrice,
-        undefined, // Don't update closePrice here - only when market ends
-        null, // type_win will be set when market ends
-      );
-
-      this.logger.info(
-        {
-          slug: market.slug,
-          openPrice: priceData.openPrice,
-          apiReturnedClosePrice: priceData.closePrice,
-          completed: priceData.completed,
-        },
-        '✅ [MarketManagerService] [fetchAndSaveOpenPrice] Successfully saved openPrice (closePrice will be saved when market ends)',
-      );
-    } catch (error) {
-      this.logger.error(
-        { slug: market.slug, error: error instanceof Error ? error.message : String(error) },
-        '🔴 [MarketManagerService] [fetchAndSaveOpenPrice] Error fetching openPrice',
-      );
     }
   }
 
   /**
    * Fetch and save closePrice and calculate type_win when market ends
+   * Retry 10 times with 5 seconds delay between retries
    */
   private async fetchAndSaveClosePrice(market: MarketData): Promise<void> {
+    const MAX_RETRIES = 10;
+    const RETRY_DELAY_MS = 5000; // 5 seconds
+
+    // Extract timestamp from slug để đảm bảo consistency với slug pattern
+    const slugStartTimestamp = this.extractTimestampFromSlug(market.slug);
+    const slugEndTimestamp = slugStartTimestamp ? slugStartTimestamp + MARKET_DURATION : market.endTimestamp;
+    
+    // Use timestamp from slug nếu có, fallback to Gamma API timestamps
+    const startTimestamp = slugStartTimestamp || market.startTimestamp;
+    const endTimestamp = slugEndTimestamp || market.endTimestamp;
+
+    this.logger.info(
+      {
+        slug: market.slug,
+        slugStartTimestamp,
+        slugEndTimestamp,
+        gammaStartTimestamp: market.startTimestamp,
+        gammaEndTimestamp: market.endTimestamp,
+        usingStartTimestamp: startTimestamp,
+        usingEndTimestamp: endTimestamp,
+        maxRetries: MAX_RETRIES,
+        retryDelaySeconds: RETRY_DELAY_MS / 1000,
+      },
+      '💰 [MarketManagerService] [fetchAndSaveClosePrice] Fetching closePrice for ended market (with retry)',
+    );
+
+    // Retry logic: retry 10 times, wait 5 seconds between retries
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const priceData = await this.cryptoPriceService.fetchCryptoPriceByMarket(
+          market.slug,
+          startTimestamp,
+          endTimestamp,
+        );
+
+        if (!priceData) {
+          if (attempt < MAX_RETRIES) {
+            this.logger.warn(
+              { slug: market.slug, attempt, maxRetries: MAX_RETRIES, nextRetryInSeconds: RETRY_DELAY_MS / 1000 },
+              `⚠️ [MarketManagerService] [fetchAndSaveClosePrice] Failed to fetch crypto price (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_DELAY_MS / 1000}s...`,
+            );
+            // Wait 5 seconds before retry
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+            continue;
+          } else {
+            this.logger.error(
+              { slug: market.slug, attempts: MAX_RETRIES },
+              `🔴 [MarketManagerService] [fetchAndSaveClosePrice] Failed to fetch crypto price after ${MAX_RETRIES} attempts`,
+            );
+            return;
+          }
+        }
+
+        // Get existing market data to check if we already have openPrice
+        const existingMarket = await this.marketRegistry.findBySlug(market.slug);
+        const openPrice = existingMarket?.open_price ?? priceData.openPrice;
+
+        // Calculate type_win: UP if openPrice < closePrice, DOWN otherwise
+        let typeWin: 'UP' | 'DOWN' | null = null;
+        if (priceData.completed && priceData.closePrice !== null && openPrice !== null) {
+          typeWin = openPrice < priceData.closePrice ? MarketWinType.UP : MarketWinType.DOWN;
+        }
+
+        // Update with closePrice and type_win
+        // If we don't have openPrice yet, save it too
+        await this.marketRegistry.updateCryptoPrices(
+          market.slug,
+          openPrice !== existingMarket?.open_price ? openPrice : undefined,
+          priceData.closePrice || null,
+          typeWin,
+        );
+
+        this.logger.info(
+          {
+            slug: market.slug,
+            attempt,
+            openPrice,
+            closePrice: priceData.closePrice,
+            typeWin,
+            completed: priceData.completed,
+          },
+          `✅ [MarketManagerService] [fetchAndSaveClosePrice] Successfully saved closePrice and type_win (attempt ${attempt}/${MAX_RETRIES})`,
+        );
+        return; // Success, exit retry loop
+      } catch (error) {
+        if (attempt < MAX_RETRIES) {
+          this.logger.warn(
+            {
+              slug: market.slug,
+              attempt,
+              maxRetries: MAX_RETRIES,
+              error: error instanceof Error ? error.message : String(error),
+              nextRetryInSeconds: RETRY_DELAY_MS / 1000,
+            },
+            `⚠️ [MarketManagerService] [fetchAndSaveClosePrice] Error fetching closePrice (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_DELAY_MS / 1000}s...`,
+          );
+          // Wait 5 seconds before retry
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        } else {
+          this.logger.error(
+            {
+              slug: market.slug,
+              attempts: MAX_RETRIES,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            `🔴 [MarketManagerService] [fetchAndSaveClosePrice] Error fetching closePrice after ${MAX_RETRIES} attempts`,
+          );
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Retry fetching closePrice for ended markets that are missing close_price or type_win
+   * This can be called periodically to fill in missing data
+   */
+  async retryFetchClosePriceForEndedMarkets(): Promise<void> {
     try {
-      // Extract timestamp from slug để đảm bảo consistency với slug pattern
-      const slugStartTimestamp = this.extractTimestampFromSlug(market.slug);
-      const slugEndTimestamp = slugStartTimestamp ? slugStartTimestamp + MARKET_DURATION : market.endTimestamp;
-      
-      // Use timestamp from slug nếu có, fallback to Gamma API timestamps
-      const startTimestamp = slugStartTimestamp || market.startTimestamp;
-      const endTimestamp = slugEndTimestamp || market.endTimestamp;
+      const endedMarkets = await this.marketRegistry.findEndedMarketsNeedingUpdate();
 
-      this.logger.info(
-        {
-          slug: market.slug,
-          slugStartTimestamp,
-          slugEndTimestamp,
-          gammaStartTimestamp: market.startTimestamp,
-          gammaEndTimestamp: market.endTimestamp,
-          usingStartTimestamp: startTimestamp,
-          usingEndTimestamp: endTimestamp,
-        },
-        '💰 [MarketManagerService] [fetchAndSaveClosePrice] Fetching closePrice for ended market',
-      );
-
-      const priceData = await this.cryptoPriceService.fetchCryptoPriceByMarket(
-        market.slug,
-        startTimestamp,
-        endTimestamp,
-      );
-
-      if (!priceData) {
-        this.logger.warn({ slug: market.slug }, '⚠️ [MarketManagerService] [fetchAndSaveClosePrice] Failed to fetch crypto price, will retry later');
+      if (endedMarkets.length === 0) {
+        this.logger.info('✅ [MarketManagerService] [retryFetchClosePriceForEndedMarkets] No ended markets needing update');
         return;
       }
 
-      // Get existing market data to check if we already have openPrice
-      const existingMarket = await this.marketRegistry.findBySlug(market.slug);
-      const openPrice = existingMarket?.open_price ?? priceData.openPrice;
-
-      // Calculate type_win: UP if openPrice < closePrice, DOWN otherwise
-      let typeWin: 'UP' | 'DOWN' | null = null;
-      if (priceData.completed && priceData.closePrice !== null && openPrice !== null) {
-        typeWin = openPrice < priceData.closePrice ? MarketWinType.UP : MarketWinType.DOWN;
-      }
-
-      // Update with closePrice and type_win
-      // If we don't have openPrice yet, save it too
-      await this.marketRegistry.updateCryptoPrices(
-        market.slug,
-        openPrice !== existingMarket?.open_price ? openPrice : undefined,
-        priceData.closePrice || null,
-        typeWin,
+      this.logger.info(
+        { count: endedMarkets.length },
+        `🔄 [MarketManagerService] [retryFetchClosePriceForEndedMarkets] Found ${endedMarkets.length} ended markets missing closePrice`,
       );
 
+      for (const market of endedMarkets) {
+        try {
+          // Convert entity to MarketData format for fetchAndSaveClosePrice
+          const marketData: MarketData = {
+            slug: market.slug,
+            conditionId: market.condition_id,
+            assetYesId: market.asset_yes_id,
+            assetNoId: market.asset_no_id,
+            startTimestamp: market.start_timestamp,
+            endTimestamp: market.end_timestamp,
+          };
+
+          // Fetch and save closePrice
+          await this.fetchAndSaveClosePrice(marketData);
+
+          // Small delay to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (error) {
+          this.logger.error(
+            { slug: market.slug, error: error instanceof Error ? error.message : String(error) },
+            '🔴 [MarketManagerService] [retryFetchClosePriceForEndedMarkets] Error fetching closePrice for market',
+          );
+        }
+      }
+
       this.logger.info(
-        {
-          slug: market.slug,
-          openPrice,
-          closePrice: priceData.closePrice,
-          typeWin,
-          completed: priceData.completed,
-        },
-        '✅ [MarketManagerService] [fetchAndSaveClosePrice] Successfully saved closePrice and type_win',
+        { processed: endedMarkets.length },
+        `✅ [MarketManagerService] [retryFetchClosePriceForEndedMarkets] Completed processing ${endedMarkets.length} markets`,
       );
     } catch (error) {
       this.logger.error(
-        { slug: market.slug, error: error instanceof Error ? error.message : String(error) },
-        '🔴 [MarketManagerService] [fetchAndSaveClosePrice] Error fetching closePrice',
+        { error: error instanceof Error ? error.message : String(error) },
+        '🔴 [MarketManagerService] [retryFetchClosePriceForEndedMarkets] Error in retry process',
       );
     }
   }

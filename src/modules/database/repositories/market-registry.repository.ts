@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, IsNull, Or } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { MarketRegistryEntity } from '../entities/market-registry.entity';
 import { MarketStatus } from '@/shared/constants/polymarket.constants';
@@ -15,6 +15,42 @@ export interface CreateMarketRegistryData {
   open_price?: number | null;
   close_price?: number | null;
   type_win?: 'UP' | 'DOWN' | null;
+  index_15m?: number | null;
+}
+
+/**
+ * Calculate index_15m from start_timestamp
+ * Index represents the position of 15-minute market in a day (1-96, 96 markets per day)
+ * Index starts from 1, not 0
+ * @param startTimestamp Unix timestamp in seconds
+ * @returns Index (1-96) or null if invalid
+ */
+export function calculateIndex15m(startTimestamp: number): number | null {
+  try {
+    // Get start of day (00:00:00 UTC) for the given timestamp
+    const date = new Date(startTimestamp * 1000);
+    const startOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+    const startOfDayTimestamp = Math.floor(startOfDay.getTime() / 1000);
+
+    // Calculate seconds from start of day
+    const secondsFromStartOfDay = startTimestamp - startOfDayTimestamp;
+
+    // Divide by 900 (15 minutes = 900 seconds) to get base index (0-95)
+    // 1 day = 24 hours * 60 minutes / 15 minutes = 96 markets
+    const baseIndex = Math.floor(secondsFromStartOfDay / 900);
+
+    // Convert to 1-based index (1-96)
+    const index = baseIndex + 1;
+
+    // Validate index is within range (1-96)
+    if (index >= 1 && index <= 96) {
+      return index;
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
 }
 
 export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
@@ -25,8 +61,12 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
   /**
    * Create or update market registry entry
    * Uses ON CONFLICT to handle duplicates by slug
+   * Automatically calculates index_15m from start_timestamp if not provided
    */
   async upsertMarket(data: CreateMarketRegistryData): Promise<MarketRegistryEntity> {
+    // Calculate index_15m if not provided
+    const index_15m = data.index_15m !== undefined ? data.index_15m : calculateIndex15m(data.start_timestamp);
+
     // Find existing market by slug (including soft-deleted ones)
     const existing = await this.findOne({
       where: { slug: data.slug },
@@ -51,6 +91,7 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
         open_price: data.open_price !== undefined ? data.open_price : existing.open_price,
         close_price: data.close_price !== undefined ? data.close_price : existing.close_price,
         type_win: data.type_win !== undefined ? data.type_win : existing.type_win,
+        index_15m: index_15m !== undefined ? index_15m : existing.index_15m ?? calculateIndex15m(data.start_timestamp),
         deleted_at: null, // Clear soft delete if exists
         updated_at: new Date(),
       });
@@ -70,6 +111,7 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
       open_price: data.open_price || null,
       close_price: data.close_price || null,
       type_win: data.type_win || null,
+      index_15m: index_15m || null,
     });
 
     return await this.save(market);
@@ -135,6 +177,20 @@ export class MarketRegistryRepository extends Repository<MarketRegistryEntity> {
       where: { status: MarketStatus.UPCOMING },
       order: { start_timestamp: 'ASC' },
     });
+  }
+
+  /**
+   * Find ended markets that need closePrice update
+   * Markets with status = ENDED but missing close_price (if close_price is null, type_win will also be null)
+   */
+  async findEndedMarketsNeedingUpdate(): Promise<MarketRegistryEntity[]> {
+    // Use query builder to find markets with status = ENDED AND close_price IS NULL
+    // Note: If close_price is null, type_win will also be null (it depends on close_price)
+    return await this.createQueryBuilder('market')
+      .where('market.status = :status', { status: MarketStatus.ENDED })
+      .andWhere('market.close_price IS NULL')
+      .orderBy('market.end_timestamp', 'DESC')
+      .getMany();
   }
 
   /**
