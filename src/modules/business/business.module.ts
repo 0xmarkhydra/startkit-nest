@@ -8,6 +8,7 @@ import {
   MarketManagerService,
   MarketPriceChangeBatchService,
   BtcChainlinkPriceBatchService,
+  BtcBinancePriceBatchService,
   PolymarketPriceWebSocketService,
 } from './services';
 import { PolymarketCryptoPriceService } from './services/polymarket-crypto-price.service';
@@ -24,6 +25,7 @@ const services = [
   PolymarketWebSocketCollectorService,
   MarketManagerService,
   BtcChainlinkPriceBatchService,
+  BtcBinancePriceBatchService,
   PolymarketPriceWebSocketService,
 ];
 

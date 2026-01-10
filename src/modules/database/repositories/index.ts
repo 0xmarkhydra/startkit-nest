@@ -4,3 +4,4 @@ export * from './market-registry.repository';
 export * from './market-trade.repository';
 export * from './market-price-change.repository';
 export * from './btc-chainlink-price.repository';
+export * from './btc-binance-price.repository';

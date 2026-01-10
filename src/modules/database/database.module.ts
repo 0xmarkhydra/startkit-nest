@@ -9,6 +9,7 @@ import {
   MarketTradeRepository,
   MarketPriceChangeRepository,
   BtcChainlinkPriceRepository,
+  BtcBinancePriceRepository,
 } from './repositories';
 import {
   AdminConfigEntity,
@@ -17,6 +18,7 @@ import {
   MarketTradeEntity,
   MarketPriceChangeEntity,
   BtcChainlinkPriceEntity,
+  BtcBinancePriceEntity,
 } from './entities';
 import { SeedDatabase } from './seeders/seed.database';
 
@@ -27,6 +29,7 @@ const repositories = [
   MarketTradeRepository,
   MarketPriceChangeRepository,
   BtcChainlinkPriceRepository,
+  BtcBinancePriceRepository,
 ];
 
 const services = [];
@@ -38,6 +41,7 @@ const entities = [
   MarketTradeEntity,
   MarketPriceChangeEntity,
   BtcChainlinkPriceEntity,
+  BtcBinancePriceEntity,
 ];
 
 @Module({

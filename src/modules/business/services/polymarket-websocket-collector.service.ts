@@ -543,10 +543,19 @@ export class PolymarketWebSocketCollectorService implements OnModuleDestroy {
     // Get current Chainlink price from cache
     const currentChainlinkPrice = this.priceWebSocketService.getCurrentChainlinkPrice();
 
+    // Get current Binance price from cache
+    const currentBinancePrice = this.priceWebSocketService.getCurrentBinancePrice();
+
     // Calculate delta_price = price_chainlink - open_price (if both are available)
     let deltaPrice: number | null = null;
     if (currentChainlinkPrice !== null && openPrice !== null) {
       deltaPrice = currentChainlinkPrice - openPrice;
+    }
+
+    // Calculate price_binance_diff = price_binance - price_chainlink (if both are available)
+    let priceBinanceDiff: number | null = null;
+    if (currentBinancePrice !== null && currentChainlinkPrice !== null) {
+      priceBinanceDiff = currentBinancePrice - currentChainlinkPrice;
     }
 
     // Save trade to market_trades table if we have valid data
@@ -564,10 +573,12 @@ export class PolymarketWebSocketCollectorService implements OnModuleDestroy {
           timestamp,
           price_chainlink: currentChainlinkPrice,
           delta_price: deltaPrice,
+          price_binance: currentBinancePrice,
+          price_binance_diff: priceBinanceDiff,
         });
 
         this.logger.debug(
-          { assetId, marketSlug, tradeType, price, size, side, price_chainlink: currentChainlinkPrice, delta_price: deltaPrice, open_price: openPrice },
+          { assetId, marketSlug, tradeType, price, size, side, price_chainlink: currentChainlinkPrice, delta_price: deltaPrice, price_binance: currentBinancePrice, price_binance_diff: priceBinanceDiff, open_price: openPrice },
           '✅ [PolymarketWebSocketCollectorService] [processLastTradePriceEvent] Saved trade to market_trades',
         );
       } catch (error) {

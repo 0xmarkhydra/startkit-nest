@@ -14,6 +14,8 @@ export interface CreateMarketTradeData {
   timestamp: Date;
   price_chainlink?: number | null; // Current Chainlink BTC/USD price
   delta_price?: number | null; // Delta price = price_chainlink - open_price
+  price_binance?: number | null; // Current Binance BTC/USDT price
+  price_binance_diff?: number | null; // Delta = price_binance - price_chainlink
 }
 
 export interface BatchInsertTrade {
@@ -28,6 +30,8 @@ export interface BatchInsertTrade {
   timestamp: Date;
   price_chainlink?: number | null; // Current Chainlink BTC/USD price
   delta_price?: number | null; // Delta price = price_chainlink - open_price
+  price_binance?: number | null; // Current Binance BTC/USDT price
+  price_binance_diff?: number | null; // Delta = price_binance - price_chainlink
 }
 
 export class MarketTradeRepository extends Repository<MarketTradeEntity> {
@@ -57,6 +61,8 @@ export class MarketTradeRepository extends Repository<MarketTradeEntity> {
         timestamp: trade.timestamp,
         price_chainlink: trade.price_chainlink ?? null,
         delta_price: trade.delta_price ?? null,
+        price_binance: trade.price_binance ?? null,
+        price_binance_diff: trade.price_binance_diff ?? null,
       }),
     );
 
@@ -79,6 +85,8 @@ export class MarketTradeRepository extends Repository<MarketTradeEntity> {
       timestamp: data.timestamp,
       price_chainlink: data.price_chainlink ?? null,
       delta_price: data.delta_price ?? null,
+      price_binance: data.price_binance ?? null,
+      price_binance_diff: data.price_binance_diff ?? null,
     });
 
     return await this.save(trade);

@@ -5,4 +5,5 @@ export * from './market-registry.entity';
 export * from './market-trade.entity';
 export * from './market-price-change.entity';
 export * from './btc-chainlink-price.entity';
+export * from './btc-binance-price.entity';
 

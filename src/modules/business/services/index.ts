@@ -7,4 +7,5 @@ export * from './market-price-change-batch.service';
 export * from './polymarket-websocket-collector.service';
 export * from './market-manager.service';
 export * from './btc-chainlink-price-batch.service';
+export * from './btc-binance-price-batch.service';
 export * from './polymarket-price-websocket.service'; 

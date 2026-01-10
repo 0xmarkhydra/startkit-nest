@@ -42,5 +42,11 @@ export class MarketTradeEntity extends BaseEntity {
 
   @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
   delta_price: number | null; // Delta price = price_chainlink - open_price
+
+  @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
+  price_binance: number | null; // Current Binance BTC/USDT price at trade time
+
+  @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
+  price_binance_diff: number | null; // Delta = price_binance - price_chainlink
 }
 

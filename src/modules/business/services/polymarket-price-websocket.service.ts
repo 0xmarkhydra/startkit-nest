@@ -3,6 +3,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import WebSocket from 'ws';
 import { POLYMARKET_PRICE_WS_URL, PRICE_PING_INTERVAL } from '@/shared/constants/polymarket.constants';
 import { BtcChainlinkPriceBatchService } from './btc-chainlink-price-batch.service';
+import { BtcBinancePriceBatchService } from './btc-binance-price-batch.service';
 
 @Injectable()
 export class PolymarketPriceWebSocketService implements OnModuleDestroy {
@@ -13,10 +14,13 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
   private maxReconnectAttempts: number = 10;
   private reconnectDelay: number = 5000; // 5 seconds base delay
   private isSubscribed: boolean = false;
+  private isSubscribedBinance: boolean = false;
   private currentChainlinkPrice: number | null = null; // Cache current Chainlink BTC/USD price
+  private currentBinancePrice: number | null = null; // Cache current Binance BTC/USDT price
 
   constructor(
     private readonly priceBatchService: BtcChainlinkPriceBatchService,
+    private readonly binancePriceBatchService: BtcBinancePriceBatchService,
     @InjectPinoLogger(PolymarketPriceWebSocketService.name) private readonly logger: PinoLogger,
   ) {}
 
@@ -54,6 +58,11 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
         if (!this.isSubscribed) {
           this.subscribeChainlinkPrice();
         }
+
+        // Subscribe to Binance price feed if not already subscribed
+        if (!this.isSubscribedBinance) {
+          this.subscribeBinancePrice();
+        }
       });
 
       this.wsClient.on('message', (data: WebSocket.Data) => {
@@ -68,6 +77,7 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
       this.wsClient.on('close', (code: number, reason: Buffer) => {
         this.isConnected = false;
         this.isSubscribed = false;
+        this.isSubscribedBinance = false;
         this.logger.warn({ code, reason: reason.toString() }, '⚠️ [PolymarketPriceWebSocketService] [connect] WebSocket closed');
 
         // Stop ping loop
@@ -96,6 +106,7 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
     this.wsClient.close();
     this.isConnected = false;
     this.isSubscribed = false;
+    this.isSubscribedBinance = false;
     this.logger.info('✅ [PolymarketPriceWebSocketService] [disconnect] Price WebSocket disconnected');
   }
 
@@ -112,6 +123,14 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
    */
   getCurrentChainlinkPrice(): number | null {
     return this.currentChainlinkPrice;
+  }
+
+  /**
+   * Get current Binance BTC/USDT price from cache
+   * @returns Current Binance price or null if not available
+   */
+  getCurrentBinancePrice(): number | null {
+    return this.currentBinancePrice;
   }
 
   /**
@@ -141,6 +160,32 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
   }
 
   /**
+   * Subscribe to Binance price feed
+   * Topic: crypto_prices
+   * Symbol: BTCUSDT (filtered in handler)
+   */
+  subscribeBinancePrice(): void {
+    if (!this.wsClient || !this.isConnected) {
+      this.logger.warn('⚠️ [PolymarketPriceWebSocketService] [subscribeBinancePrice] Not connected, cannot subscribe');
+      return;
+    }
+
+    const subscribeMessage = {
+      action: 'subscribe',
+      subscriptions: [
+        {
+          topic: 'crypto_prices',
+          type: 'update',
+        },
+      ],
+    };
+
+    this.wsClient.send(JSON.stringify(subscribeMessage));
+    this.isSubscribedBinance = true;
+    this.logger.info('✅ [PolymarketPriceWebSocketService] [subscribeBinancePrice] Subscribed to Binance price feed');
+  }
+
+  /**
    * Handle incoming WebSocket messages
    */
   private handleMessage(data: WebSocket.Data): void {
@@ -150,10 +195,26 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
       const msgType = message.type || '';
       const topic = message.topic || '';
 
-      // Only process Chainlink price messages
-      if (topic !== 'crypto_prices_chainlink') {
-        return;
+      // Process Chainlink price messages
+      if (topic === 'crypto_prices_chainlink') {
+        this.handleChainlinkMessage(message, msgType);
       }
+      // Process Binance price messages
+      else if (topic === 'crypto_prices') {
+        this.handleBinanceMessage(message, msgType);
+      }
+    } catch (error) {
+      this.logger.error(
+        { error: error instanceof Error ? error.message : String(error), data: data.toString().substring(0, 200) },
+        '🔴 [PolymarketPriceWebSocketService] [handleMessage] Error processing message',
+      );
+    }
+  }
+
+  /**
+   * Handle Chainlink price messages
+   */
+  private handleChainlinkMessage(message: any, msgType: string): void {
 
       // Handle "update" message (real-time price updates)
       if (msgType === 'update') {
@@ -178,11 +239,11 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
           this.priceBatchService.savePrice(priceTimestamp, 'btc/usd', price).catch((error) => {
             this.logger.error(
               { symbol, price, error: error instanceof Error ? error.message : String(error) },
-              '🔴 [PolymarketPriceWebSocketService] [handleMessage] Error saving price',
+              '🔴 [PolymarketPriceWebSocketService] [handleChainlinkMessage] Error saving price',
             );
           });
 
-          this.logger.debug({ symbol, price, timestamp: priceTimestamp.toISOString() }, '💰 [PolymarketPriceWebSocketService] [handleMessage] Received Chainlink price');
+          this.logger.debug({ symbol, price, timestamp: priceTimestamp.toISOString() }, '💰 [PolymarketPriceWebSocketService] [handleChainlinkMessage] Received Chainlink price');
         }
       }
 
@@ -215,7 +276,7 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
             this.priceBatchService.savePrice(priceTimestamp, 'btc/usd', price).catch((error) => {
               this.logger.error(
                 { symbol, price, error: error instanceof Error ? error.message : String(error) },
-                '🔴 [PolymarketPriceWebSocketService] [handleMessage] Error saving price from snapshot',
+                '🔴 [PolymarketPriceWebSocketService] [handleChainlinkMessage] Error saving price from snapshot',
               );
             });
           }
@@ -226,13 +287,86 @@ export class PolymarketPriceWebSocketService implements OnModuleDestroy {
           this.currentChainlinkPrice = latestPrice;
         }
 
-        this.logger.info({ symbol, points: data.length }, '📸 [PolymarketPriceWebSocketService] [handleMessage] Received Chainlink price snapshot');
+        this.logger.info({ symbol, points: data.length }, '📸 [PolymarketPriceWebSocketService] [handleChainlinkMessage] Received Chainlink price snapshot');
       }
-    } catch (error) {
-      this.logger.error(
-        { error: error instanceof Error ? error.message : String(error), data: data.toString().substring(0, 200) },
-        '🔴 [PolymarketPriceWebSocketService] [handleMessage] Error processing message',
-      );
+  }
+
+  /**
+   * Handle Binance price messages
+   */
+  private handleBinanceMessage(message: any, msgType: string): void {
+    // Handle "update" message (real-time price updates)
+    if (msgType === 'update') {
+      const payload = message.payload || {};
+      const symbol = (payload.symbol || '').toLowerCase();
+      const price = payload.value || 0;
+      const timestamp = message.timestamp || Date.now();
+
+      // Filter: chỉ lấy BTCUSDT
+      if (symbol !== 'btcusdt') {
+        return;
+      }
+
+      if (symbol && price > 0) {
+        // Parse timestamp (can be in milliseconds or seconds)
+        const priceTimestamp = typeof timestamp === 'number' ? new Date(timestamp > 1000000000000 ? timestamp : timestamp * 1000) : new Date();
+
+        // Update cache with current Binance price
+        this.currentBinancePrice = price;
+
+        // Save price to batch queue
+        this.binancePriceBatchService.savePrice(priceTimestamp, 'btcusdt', price).catch((error) => {
+          this.logger.error(
+            { symbol, price, error: error instanceof Error ? error.message : String(error) },
+            '🔴 [PolymarketPriceWebSocketService] [handleBinanceMessage] Error saving price',
+          );
+        });
+
+        this.logger.debug({ symbol, price, timestamp: priceTimestamp.toISOString() }, '💰 [PolymarketPriceWebSocketService] [handleBinanceMessage] Received Binance price');
+      }
+    }
+
+    // Handle "subscribe" message (snapshot - có thể có nhiều data points)
+    if (msgType === 'subscribe') {
+      const payload = message.payload || {};
+      const symbol = (payload.symbol || '').toLowerCase();
+      const data = payload.data || [];
+      const timestamp = message.timestamp || Date.now();
+
+      // Filter: chỉ lấy BTCUSDT
+      if (symbol !== 'btcusdt') {
+        return;
+      }
+
+      // Process all data points in snapshot
+      let latestPrice: number | null = null;
+      for (const point of data) {
+        const price = point.value || 0;
+        const pointTimestamp = point.timestamp || timestamp;
+
+        if (price > 0) {
+          // Parse timestamp (can be in milliseconds or seconds)
+          const priceTimestamp = typeof pointTimestamp === 'number' ? new Date(pointTimestamp > 1000000000000 ? pointTimestamp : pointTimestamp * 1000) : new Date();
+
+          // Track latest price from snapshot (last point is the most recent)
+          latestPrice = price;
+
+          // Save price to batch queue
+          this.binancePriceBatchService.savePrice(priceTimestamp, 'btcusdt', price).catch((error) => {
+            this.logger.error(
+              { symbol, price, error: error instanceof Error ? error.message : String(error) },
+              '🔴 [PolymarketPriceWebSocketService] [handleBinanceMessage] Error saving price from snapshot',
+            );
+          });
+        }
+      }
+
+      // Update cache with latest Binance price from snapshot (last point is the most recent)
+      if (latestPrice !== null) {
+        this.currentBinancePrice = latestPrice;
+      }
+
+      this.logger.info({ symbol, points: data.length }, '📸 [PolymarketPriceWebSocketService] [handleBinanceMessage] Received Binance price snapshot');
     }
   }
 

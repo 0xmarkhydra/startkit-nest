@@ -8,6 +8,7 @@ import { RawMessageBatchService } from '@/business/services/raw-message-batch.se
 import { MarketTradeBatchService } from '@/business/services/market-trade-batch.service';
 import { MarketPriceChangeBatchService } from '@/business/services/market-price-change-batch.service';
 import { BtcChainlinkPriceBatchService } from '@/business/services/btc-chainlink-price-batch.service';
+import { BtcBinancePriceBatchService } from '@/business/services/btc-binance-price-batch.service';
 import { WsRawMessageRepository } from '@/database/repositories/ws-raw-message.repository';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -27,6 +28,7 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
     private readonly tradeBatchService: MarketTradeBatchService,
     private readonly priceChangeBatchService: MarketPriceChangeBatchService,
     private readonly priceBatchService: BtcChainlinkPriceBatchService,
+    private readonly binancePriceBatchService: BtcBinancePriceBatchService,
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectPinoLogger(PolymarketCollectorScheduler.name) private readonly logger: PinoLogger,
   ) {
@@ -90,6 +92,7 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
       await this.tradeBatchService.flushQueue(); // Market trades
       await this.priceChangeBatchService.flushQueue(); // Market price changes
       await this.priceBatchService.flushQueue(); // BTC Chainlink prices
+      await this.binancePriceBatchService.flushQueue(); // BTC Binance prices
 
       this.logger.info('✅ [PolymarketCollectorScheduler] [onModuleDestroy] Polymarket collector shutdown completed');
     } catch (error) {
