@@ -97,10 +97,10 @@ export class RawMessageBatchService implements OnModuleDestroy {
       // Batch insert into database
       await this.wsRawMessageRepository.batchInsert(batch);
 
-      this.logger.info(
-        { batchSize, remainingInQueue: this.messageQueue.length },
-        '✅ [RawMessageBatchService] [processBatch] Batch inserted successfully',
-      );
+      // this.logger.info(
+      //   { batchSize, remainingInQueue: this.messageQueue.length },
+      //   '✅ [RawMessageBatchService] [processBatch] Batch inserted successfully',
+      // );
 
       // If there are more messages in queue, process again after interval
       if (this.messageQueue.length > 0) {

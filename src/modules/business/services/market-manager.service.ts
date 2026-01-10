@@ -6,9 +6,11 @@ import {
   OVERLAP_AFTER,
   MONITOR_INTERVAL,
   MarketStatus,
+  MarketWinType,
 } from '@/shared/constants/polymarket.constants';
 import { PolymarketGammaService, MarketInfo } from './polymarket-gamma.service';
 import { PolymarketWebSocketCollectorService } from './polymarket-websocket-collector.service';
+import { PolymarketCryptoPriceService } from './polymarket-crypto-price.service';
 import { MarketRegistryRepository, CreateMarketRegistryData } from '@/database/repositories/market-registry.repository';
 import { MarketRegistryEntity } from '@/database/entities/market-registry.entity';
 
@@ -28,6 +30,7 @@ export class MarketManagerService implements OnModuleDestroy {
     private readonly gammaService: PolymarketGammaService,
     private readonly wsCollector: PolymarketWebSocketCollectorService,
     private readonly marketRegistry: MarketRegistryRepository,
+    private readonly cryptoPriceService: PolymarketCryptoPriceService,
     @InjectPinoLogger(MarketManagerService.name) private readonly logger: PinoLogger,
   ) {}
 
@@ -98,6 +101,9 @@ export class MarketManagerService implements OnModuleDestroy {
       // Save markets to database
       await this.saveMarketToRegistry(this.currentMarket, MarketStatus.ACTIVE);
       await this.saveMarketToRegistry(this.upcomingMarket, MarketStatus.UPCOMING);
+
+      // Fetch openPrice for current market when it starts
+      await this.fetchAndSaveOpenPrice(this.currentMarket);
 
       // Subscribe to markets
       await this.subscribeToMarket(this.currentMarket, MarketStatus.ACTIVE);
@@ -402,6 +408,9 @@ export class MarketManagerService implements OnModuleDestroy {
       const endedAssets = [this.currentMarket.assetYesId, this.currentMarket.assetNoId];
       this.wsCollector.unsubscribe(endedAssets);
 
+      // Fetch closePrice and calculate type_win for ended market (A)
+      await this.fetchAndSaveClosePrice(this.currentMarket);
+
       // Update database: current market ended
       await this.marketRegistry.updateStatus(this.currentMarket.slug, MarketStatus.ENDED, new Date());
 
@@ -409,6 +418,9 @@ export class MarketManagerService implements OnModuleDestroy {
       const oldCurrent = this.currentMarket;
       this.currentMarket = this.upcomingMarket;
       await this.marketRegistry.updateStatus(this.currentMarket.slug, MarketStatus.ACTIVE, null);
+
+      // Fetch openPrice for new current market when it becomes active
+      await this.fetchAndSaveOpenPrice(this.currentMarket);
 
       // Fetch new upcoming market (C)
       const newUpcomingSlug = this.calculateNextMarketSlug(this.currentMarket.startTimestamp);
@@ -473,6 +485,161 @@ export class MarketManagerService implements OnModuleDestroy {
    */
   getUpcomingMarket(): MarketData | null {
     return this.upcomingMarket;
+  }
+
+  /**
+   * Fetch and save openPrice when market starts (becomes ACTIVE)
+   */
+  private async fetchAndSaveOpenPrice(market: MarketData): Promise<void> {
+    try {
+      // Check if market already has openPrice
+      const existingMarket = await this.marketRegistry.findBySlug(market.slug);
+      if (existingMarket && existingMarket.open_price !== null) {
+        this.logger.info(
+          {
+            slug: market.slug,
+            existingOpenPrice: existingMarket.open_price,
+            startTimestamp: market.startTimestamp,
+            endTimestamp: market.endTimestamp,
+          },
+          '💰 [MarketManagerService] [fetchAndSaveOpenPrice] Market already has openPrice, skipping',
+        );
+        return;
+      }
+
+      // Extract timestamp from slug để đảm bảo consistency với slug pattern
+      // Slug format: "btc-updown-15m-{timestamp}" - timestamp này là start timestamp thực tế
+      const slugStartTimestamp = this.extractTimestampFromSlug(market.slug);
+      const slugEndTimestamp = slugStartTimestamp ? slugStartTimestamp + MARKET_DURATION : market.endTimestamp;
+      
+      // Use timestamp from slug nếu có, fallback to Gamma API timestamps
+      const startTimestamp = slugStartTimestamp || market.startTimestamp;
+      const endTimestamp = slugEndTimestamp || market.endTimestamp;
+
+      this.logger.info(
+        {
+          slug: market.slug,
+          slugStartTimestamp,
+          slugEndTimestamp,
+          gammaStartTimestamp: market.startTimestamp,
+          gammaEndTimestamp: market.endTimestamp,
+          usingStartTimestamp: startTimestamp,
+          usingEndTimestamp: endTimestamp,
+          startDate: new Date(startTimestamp * 1000).toISOString(),
+          endDate: new Date(endTimestamp * 1000).toISOString(),
+        },
+        '💰 [MarketManagerService] [fetchAndSaveOpenPrice] Fetching openPrice for market',
+      );
+
+      const priceData = await this.cryptoPriceService.fetchCryptoPriceByMarket(
+        market.slug,
+        startTimestamp,
+        endTimestamp,
+      );
+
+      if (!priceData) {
+        this.logger.warn({ slug: market.slug }, '⚠️ [MarketManagerService] [fetchAndSaveOpenPrice] Failed to fetch crypto price, will retry later');
+        return;
+      }
+
+      // Save openPrice ONLY (closePrice will be saved when market ends)
+      // Don't save closePrice here even if API returns it - only save when market status is ENDED
+      await this.marketRegistry.updateCryptoPrices(
+        market.slug,
+        priceData.openPrice,
+        undefined, // Don't update closePrice here - only when market ends
+        null, // type_win will be set when market ends
+      );
+
+      this.logger.info(
+        {
+          slug: market.slug,
+          openPrice: priceData.openPrice,
+          apiReturnedClosePrice: priceData.closePrice,
+          completed: priceData.completed,
+        },
+        '✅ [MarketManagerService] [fetchAndSaveOpenPrice] Successfully saved openPrice (closePrice will be saved when market ends)',
+      );
+    } catch (error) {
+      this.logger.error(
+        { slug: market.slug, error: error instanceof Error ? error.message : String(error) },
+        '🔴 [MarketManagerService] [fetchAndSaveOpenPrice] Error fetching openPrice',
+      );
+    }
+  }
+
+  /**
+   * Fetch and save closePrice and calculate type_win when market ends
+   */
+  private async fetchAndSaveClosePrice(market: MarketData): Promise<void> {
+    try {
+      // Extract timestamp from slug để đảm bảo consistency với slug pattern
+      const slugStartTimestamp = this.extractTimestampFromSlug(market.slug);
+      const slugEndTimestamp = slugStartTimestamp ? slugStartTimestamp + MARKET_DURATION : market.endTimestamp;
+      
+      // Use timestamp from slug nếu có, fallback to Gamma API timestamps
+      const startTimestamp = slugStartTimestamp || market.startTimestamp;
+      const endTimestamp = slugEndTimestamp || market.endTimestamp;
+
+      this.logger.info(
+        {
+          slug: market.slug,
+          slugStartTimestamp,
+          slugEndTimestamp,
+          gammaStartTimestamp: market.startTimestamp,
+          gammaEndTimestamp: market.endTimestamp,
+          usingStartTimestamp: startTimestamp,
+          usingEndTimestamp: endTimestamp,
+        },
+        '💰 [MarketManagerService] [fetchAndSaveClosePrice] Fetching closePrice for ended market',
+      );
+
+      const priceData = await this.cryptoPriceService.fetchCryptoPriceByMarket(
+        market.slug,
+        startTimestamp,
+        endTimestamp,
+      );
+
+      if (!priceData) {
+        this.logger.warn({ slug: market.slug }, '⚠️ [MarketManagerService] [fetchAndSaveClosePrice] Failed to fetch crypto price, will retry later');
+        return;
+      }
+
+      // Get existing market data to check if we already have openPrice
+      const existingMarket = await this.marketRegistry.findBySlug(market.slug);
+      const openPrice = existingMarket?.open_price ?? priceData.openPrice;
+
+      // Calculate type_win: UP if openPrice < closePrice, DOWN otherwise
+      let typeWin: 'UP' | 'DOWN' | null = null;
+      if (priceData.completed && priceData.closePrice !== null && openPrice !== null) {
+        typeWin = openPrice < priceData.closePrice ? MarketWinType.UP : MarketWinType.DOWN;
+      }
+
+      // Update with closePrice and type_win
+      // If we don't have openPrice yet, save it too
+      await this.marketRegistry.updateCryptoPrices(
+        market.slug,
+        openPrice !== existingMarket?.open_price ? openPrice : undefined,
+        priceData.closePrice || null,
+        typeWin,
+      );
+
+      this.logger.info(
+        {
+          slug: market.slug,
+          openPrice,
+          closePrice: priceData.closePrice,
+          typeWin,
+          completed: priceData.completed,
+        },
+        '✅ [MarketManagerService] [fetchAndSaveClosePrice] Successfully saved closePrice and type_win',
+      );
+    } catch (error) {
+      this.logger.error(
+        { slug: market.slug, error: error instanceof Error ? error.message : String(error) },
+        '🔴 [MarketManagerService] [fetchAndSaveClosePrice] Error fetching closePrice',
+      );
+    }
   }
 
   /**

@@ -7,11 +7,13 @@ import {
   PolymarketWebSocketCollectorService,
   MarketManagerService,
 } from './services';
+import { PolymarketCryptoPriceService } from './services/polymarket-crypto-price.service';
 import { ConfigModule } from '@nestjs/config';
 
 const services = [
   OpenAIService,
   PolymarketGammaService,
+  PolymarketCryptoPriceService,
   RawMessageBatchService,
   PolymarketWebSocketCollectorService,
   MarketManagerService,

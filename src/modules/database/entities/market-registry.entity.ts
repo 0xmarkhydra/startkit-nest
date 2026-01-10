@@ -33,5 +33,14 @@ export class MarketRegistryEntity extends BaseEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   unsubscribed_at: Date | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
+  open_price: number | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
+  close_price: number | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  type_win: 'UP' | 'DOWN' | null;
 }
 
