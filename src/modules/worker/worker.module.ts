@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { configQueue } from './configs';
 import { DatabaseModule } from '@/database';
+import { BusinessModule } from '@/business';
 import { ScheduleService } from './schedulers/schedule.service';
+import { PolymarketCollectorScheduler } from './schedulers/polymarket-collector.scheduler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ApiModule } from '@/api';
 import { BullModule } from '@nestjs/bull';
@@ -15,7 +17,7 @@ let schedulers = [];
 
 if (isWorker) {
   consumers = [UserConsumer];
-  schedulers = [ScheduleService];
+  schedulers = [ScheduleService, PolymarketCollectorScheduler];
 }
 
 /**
@@ -42,6 +44,7 @@ const parseRedisUrl = (url: string) => {
   imports: [
     ApiModule,
     DatabaseModule,
+    BusinessModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory(config: ConfigService) {

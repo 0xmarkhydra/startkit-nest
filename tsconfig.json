@@ -26,6 +26,7 @@
       "@/api/*": ["modules/api/*"],
       "@/shared/*": ["shared/*"],
       "@/worker/*": ["modules/worker/*"],
+      "@/business": ["modules/business/index"],
       "@/business/*": ["modules/business/*"],
       "@/queue/*": ["modules/queue/*"],
       "@nestjs/passport": ["./node_modules/@nestjs/passport"],
