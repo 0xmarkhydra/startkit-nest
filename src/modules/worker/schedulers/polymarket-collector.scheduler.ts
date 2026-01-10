@@ -1,21 +1,31 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { Cron } from '@nestjs/schedule';
 import { MarketManagerService } from '@/business/services/market-manager.service';
 import { PolymarketWebSocketCollectorService } from '@/business/services/polymarket-websocket-collector.service';
 import { RawMessageBatchService } from '@/business/services/raw-message-batch.service';
+import { WsRawMessageRepository } from '@/database/repositories/ws-raw-message.repository';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { DATA_RETENTION_DAYS, CLEANUP_CRON_EXPRESSION } from '@/shared/constants/polymarket.constants';
 
 @Injectable()
 export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly isWorker: boolean;
 
+  private wsRawMessageRepo: WsRawMessageRepository;
+
   constructor(
     private readonly marketManager: MarketManagerService,
     private readonly wsCollector: PolymarketWebSocketCollectorService,
     private readonly batchService: RawMessageBatchService,
+    @InjectDataSource() private readonly dataSource: DataSource,
     @InjectPinoLogger(PolymarketCollectorScheduler.name) private readonly logger: PinoLogger,
   ) {
     // Only run when IS_WORKER=1
     this.isWorker = Boolean(Number(process.env.IS_WORKER || 0));
+    // Initialize repository with DataSource
+    this.wsRawMessageRepo = new WsRawMessageRepository(this.dataSource);
   }
 
   /**
@@ -68,6 +78,43 @@ export class PolymarketCollectorScheduler implements OnModuleInit, OnModuleDestr
       this.logger.error(
         { error: error.message },
         '🔴 [PolymarketCollectorScheduler] [onModuleDestroy] Error during shutdown',
+      );
+    }
+  }
+
+  /**
+   * Cleanup old messages older than specified days (default: 2 days)
+   * Runs daily at 2:00 AM UTC
+   * Can be configured via WS_RAW_MESSAGE_RETENTION_DAYS env variable
+   */
+  @Cron(CLEANUP_CRON_EXPRESSION, {
+    name: 'cleanup-old-messages',
+    timeZone: 'UTC',
+  })
+  async cleanupOldMessages(): Promise<void> {
+    if (!this.isWorker) {
+      return;
+    }
+
+    try {
+      // Get retention days from env variable or use default
+      const retentionDays = Number(process.env.WS_RAW_MESSAGE_RETENTION_DAYS) || DATA_RETENTION_DAYS;
+
+      this.logger.info(
+        { retentionDays },
+        `🧹 [PolymarketCollectorScheduler] [cleanupOldMessages] Starting cleanup of old messages (> ${retentionDays} days)`,
+      );
+
+      const deletedCount = await this.wsRawMessageRepo.deleteOldMessages(retentionDays);
+
+      this.logger.info(
+        { deletedCount, retentionDays },
+        `✅ [PolymarketCollectorScheduler] [cleanupOldMessages] Cleanup completed. Deleted ${deletedCount} old messages (older than ${retentionDays} days)`,
+      );
+    } catch (error) {
+      this.logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        '🔴 [PolymarketCollectorScheduler] [cleanupOldMessages] Error during cleanup',
       );
     }
   }

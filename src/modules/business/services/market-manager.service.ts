@@ -2,7 +2,8 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import {
   MARKET_DURATION,
-  OVERLAP_TIME,
+  OVERLAP_BEFORE,
+  OVERLAP_AFTER,
   MONITOR_INTERVAL,
   MarketStatus,
 } from '@/shared/constants/polymarket.constants';
@@ -222,36 +223,46 @@ export class MarketManagerService implements OnModuleDestroy {
   }
 
   /**
-   * Schedule overlap subscription (30s before current market ends)
+   * Schedule overlap subscription (15s before upcoming market starts)
+   * Theo Python code: subscribe market mới TRƯỚC 15 giây khi nó bắt đầu
    */
   private scheduleOverlapSubscription(): void {
     if (this.overlapTimeout) {
       clearTimeout(this.overlapTimeout);
     }
 
-    if (!this.currentMarket) {
+    if (!this.currentMarket || !this.upcomingMarket) {
       return;
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const timeUntilEnd = this.currentMarket.endTimestamp - now;
-    const overlapTime = timeUntilEnd - OVERLAP_TIME; // 30s before end
+    // Tính thời gian để subscribe TRƯỚC 15 giây khi upcoming market bắt đầu
+    const timeUntilUpcomingStart = this.upcomingMarket.startTimestamp - now;
+    const subscribeTime = timeUntilUpcomingStart - OVERLAP_BEFORE; // 15s before upcoming starts
 
-    if (overlapTime <= 0) {
-      // Market is ending soon, fetch and subscribe immediately
-      this.logger.warn('⚠️ [MarketManagerService] [scheduleOverlapSubscription] Market ending soon, subscribing immediately');
+    if (subscribeTime <= 0) {
+      // Upcoming market starting soon, fetch and subscribe immediately
+      this.logger.warn(
+        { upcomingSlug: this.upcomingMarket.slug, timeUntilStart: timeUntilUpcomingStart },
+        '⚠️ [MarketManagerService] [scheduleOverlapSubscription] Upcoming market starting soon, subscribing immediately',
+      );
       this.handleOverlapSubscription();
       return;
     }
 
     this.logger.info(
-      { timeUntilEnd: overlapTime, marketSlug: this.currentMarket.slug },
-      '🔄 [MarketManagerService] [scheduleOverlapSubscription] Scheduling overlap subscription',
+      {
+        timeUntilUpcomingStart,
+        subscribeTime,
+        upcomingSlug: this.upcomingMarket.slug,
+        upcomingStartTimestamp: this.upcomingMarket.startTimestamp,
+      },
+      '🔄 [MarketManagerService] [scheduleOverlapSubscription] Scheduling overlap subscription (15s before upcoming market starts)',
     );
 
     this.overlapTimeout = setTimeout(() => {
       this.handleOverlapSubscription();
-    }, overlapTime * 1000); // Convert to milliseconds
+    }, subscribeTime * 1000); // Convert to milliseconds
   }
 
   /**
@@ -347,13 +358,33 @@ export class MarketManagerService implements OnModuleDestroy {
       }
     }
 
-    if (now >= this.currentMarket.endTimestamp) {
+    // Check if current market has ended (with OVERLAP_AFTER delay)
+    // Giữ market cũ 15 giây SAU khi kết thúc để không mất data
+    const marketEndWithOverlap = this.currentMarket.endTimestamp + OVERLAP_AFTER;
+    
+    if (now >= marketEndWithOverlap) {
       this.logger.info(
-        { currentSlug: this.currentMarket.slug, endTimestamp: this.currentMarket.endTimestamp, now },
-        '🔄 [MarketManagerService] [checkAndPromoteMarkets] Current market ended, promoting markets',
+        {
+          currentSlug: this.currentMarket.slug,
+          endTimestamp: this.currentMarket.endTimestamp,
+          marketEndWithOverlap,
+          now,
+          overlapAfter: OVERLAP_AFTER,
+        },
+        '🔄 [MarketManagerService] [checkAndPromoteMarkets] Current market ended (with 15s overlap), promoting markets',
       );
 
       await this.promoteMarkets();
+    } else if (now >= this.currentMarket.endTimestamp) {
+      // Market đã kết thúc nhưng vẫn trong overlap period (15s sau khi end)
+      this.logger.debug(
+        {
+          currentSlug: this.currentMarket.slug,
+          endTimestamp: this.currentMarket.endTimestamp,
+          remainingOverlap: marketEndWithOverlap - now,
+        },
+        '🔄 [MarketManagerService] [checkAndPromoteMarkets] Current market ended, waiting for overlap period to complete',
+      );
     }
   }
 

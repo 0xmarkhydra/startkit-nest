@@ -4,7 +4,8 @@
 
 // Market timing constants (in seconds)
 export const MARKET_DURATION = 900; // 15 minutes
-export const OVERLAP_TIME = 30; // 30 seconds before market ends
+export const OVERLAP_BEFORE = 15; // Subscribe market mới 15s trước khi nó bắt đầu
+export const OVERLAP_AFTER = 15; // Giữ market cũ 15s sau khi nó kết thúc
 
 // Monitor and interval constants (in milliseconds)
 export const MONITOR_INTERVAL = 5000; // 5 seconds - check market end
@@ -38,4 +39,8 @@ export enum MarketStatus {
   ENDED = 'ended',
   UNKNOWN = 'unknown',
 }
+
+// Data retention constants
+export const DATA_RETENTION_DAYS = 2; // Delete messages older than 2 days
+export const CLEANUP_CRON_EXPRESSION = '0 2 * * *'; // Daily at 2:00 AM UTC
 
