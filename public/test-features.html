@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Lynx AI Server - Features Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 24px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .feature-card h3 {
+            color: #2c3e50;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-card h3 .icon {
+            font-size: 1.5rem;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .endpoint {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 40px;
+        }
+
+        .test-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .test-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.secondary {
+            background: #48bb78;
+        }
+
+        button.secondary:hover {
+            background: #38a169;
+        }
+
+        button.danger {
+            background: #f56565;
+        }
+
+        button.danger:hover {
+            background: #e53e3e;
+        }
+
+        .api-key-input {
+            margin: 20px 0;
+        }
+
+        .api-key-input label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .api-key-input input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .api-key-input input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .result-container {
+            margin-top: 30px;
+        }
+
+        .result {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 16px;
+            border: 1px solid #e0e0e0;
+            display: none;
+        }
+
+        .result.success {
+            border-left: 4px solid #48bb78;
+            background: #f0fff4;
+        }
+
+        .result.error {
+            border-left: 4px solid #f56565;
+            background: #fff5f5;
+        }
+
+        .result pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .result h4 {
+            margin-bottom: 12px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-indicator.online {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-indicator.offline {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .status-indicator.checking {
+            background: #feebc8;
+            color: #744210;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.online {
+            background: #38a169;
+        }
+
+        .status-dot.offline {
+            background: #e53e3e;
+        }
+
+        .status-dot.checking {
+            background: #d69e2e;
+        }
+
+        .chat-input {
+            margin: 20px 0;
+        }
+
+        .chat-input textarea {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s ease;
+        }
+
+        .chat-input textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .chat-messages {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .message {
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message.user {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+        }
+
+        .message.ai {
+            background: #f0fff4;
+            border-left: 4px solid #48bb78;
+        }
+
+        .message .role {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #2c3e50;
+        }
+
+        .message .content {
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .test-controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Model Lynx AI Server</h1>
+            <p>Comprehensive Testing Dashboard for All Features</p>
+            <div id="serverStatus" class="status-indicator checking">
+                <span class="status-dot checking"></span>
+                <span>Checking server status...</span>
+            </div>
+        </div>
+
+        <h2>📊 Project Features Overview</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3><span class="icon">🏥</span> Health Check API</h3>
+                <p>Basic health monitoring endpoints to check server and database status.</p>
+                <div class="endpoint">GET /health</div>
+                <div class="endpoint">GET /health/check-db</div>
+                <div class="endpoint">GET /health/throw (error test)</div>
+            </div>
+
+            <div class="feature-card">
+                <h3><span class="icon">🤖</span> OpenRouter Proxy</h3>
+                <p>AI model proxy service that forwards requests to OpenRouter API with custom model mapping.</p>
+                <div class="endpoint">POST /openrouter/chat/completions</div>
+                <p><strong>Model mapping:</strong> LYNXAI.01 → OpenRouter models</p>
+            </div>
+
+            <div class="feature-card">
+                <h3><span class="icon">🔐</span> Authentication & Security</h3>
+                <p>JWT authentication, API key guards, rate limiting, and security middleware.</p>
+                <div class="endpoint">API Key: Bearer token required</div>
+                <div class="endpoint">Rate limiting: 60-10000 requests/min</div>
+            </div>
+
+            <div class="feature-card">
+                <h3><span class="icon">💾</span> Database & Cache</h3>
+                <p>PostgreSQL with TypeORM, Redis caching, and connection pooling.</p>
+                <div class="endpoint">Database: PostgreSQL (Supabase)</div>
+                <div class="endpoint">Cache: Redis (cache-manager)</div>
+                <div class="endpoint">Queue: Bull (Redis-based)</div>
+            </div>
+
+            <div class="feature-card">
+                <h3><span class="icon">⚡</span> Performance Features</h3>
+                <p>HTTP caching interceptor, request throttling, and async processing.</p>
+                <div class="endpoint">Cache TTL: Configurable</div>
+                <div class="endpoint">Throttler: Global rate limiting</div>
+                <div class="endpoint">Interceptors: Response formatting</div>
+            </div>
+
+            <div class="feature-card">
+                <h3><span class="icon">🔌</span> Infrastructure</h3>
+                <p>WebSocket support, worker processes, and modular architecture.</p>
+                <div class="endpoint">WebSocket Module: Available</div>
+                <div class="endpoint">Worker Module: Background jobs</div>
+                <div class="endpoint">Queue Module: Task processing</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 Feature Testing</h2>
+            
+            <div class="api-key-input">
+                <label for="apiKey">API Key (for OpenRouter endpoints):</label>
+                <input type="password" id="apiKey" placeholder="Enter your API key for testing...">
+                <small style="color: #666; margin-top: 4px; display: block;">
+                    Required for OpenRouter endpoints. Use the API key from your environment variables.
+                </small>
+            </div>
+
+            <div class="test-controls">
+                <button onclick="testHealth()" id="healthBtn">
+                    <span class="loading" style="display: none;"></span>
+                    Test Health API
+                </button>
+                <button onclick="testDatabase()" id="dbBtn">
+                    <span class="loading" style="display: none;"></span>
+                    Test Database Connection
+                </button>
+                <button onclick="testError()" id="errorBtn">
+                    <span class="loading" style="display: none;"></span>
+                    Test Error Handling
+                </button>
+                <button onclick="checkRedis()" id="redisBtn">
+                    <span class="loading" style="display: none;"></span>
+                    Check Redis Cache
+                </button>
+            </div>
+
+            <div class="result-container">
+                <div id="testResult" class="result"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🤖 OpenRouter AI Chat Test</h2>
+            
+            <div class="chat-input">
+                <label for="chatMessage">Enter your message for AI:</label>
+                <textarea id="chatMessage" placeholder="Ask the AI anything... Example: 'Explain quantum computing in simple terms'"></textarea>
+            </div>
+
+            <div class="test-controls">
+                <button onclick="testChat()" class="secondary" id="chatBtn">
+                    <span class="loading" style="display: none;"></span>
+                    Send to OpenRouter AI
+                </button>
+                <button onclick="clearChat()" class="danger">
+                    Clear Chat
+                </button>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">
+                    <div class="role">AI Assistant</div>
+                    <div class="content">Hello! I'm your AI assistant powered by OpenRouter. Enter a message above to start chatting!</div>
+                </div>
+            </div>
+
+            <div class="result-container">
+                <div id="chatResult" class="result"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 System Status</h2>
+            <div class="test-controls">
+                <button onclick="checkAllServices()">
+                    <span class="loading" style="display: none;"></span>
+                    Check All Services
+                </button>
+                <button onclick="getServerInfo()" class="secondary">
+                    Get Server Information
+                </button>
+            </div>
+
+            <div class="result-container">
+                <div id="systemStatus" class="result"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Model Lynx AI Server • Version 0.0.1 • Built with NestJS</p>
+            <p>API Base URL: <span id="baseUrl">http://localhost:8000</span></p>
+            <p>Swagger Documentation: <a href="/docs" target="_blank">/docs</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Base URL configuration
+        const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin;
+        document.getElementById('baseUrl').textContent = BASE_URL;
+
+        // Global state
+        let chatHistory = [];
+
+        // Utility functions
+        function showLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if (btn) {
+                const loader = btn.querySelector('.loading');
+                if (loader) loader.style.display = 'inline-block';
+                btn.disabled = true;
+            }
+        }
+
+        function hideLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if (btn) {
+                const loader = btn.querySelector('.loading');
+                if (loader) loader.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        function showResult(elementId, type, title, content, data = null) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+            
+            let html = `<h4>${title}</h4>`;
+            if (content) html += `<p>${content}</p>`;
+            if (data) {
+                html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            element.innerHTML = html;
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function addChatMessage(role, content) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            messageDiv.innerHTML = `
+                <div class="role">${role === 'user' ? 'You' : 'AI Assistant'}</div>
+                <div class="content">${content}</div>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Test functions
+        async function testHealth() {
+            showLoading('healthBtn');
+            try {
+                const response = await fetch(`${BASE_URL}/health`);
+                const data = await response.text();
+                
+                if (response.ok) {
+                    showResult('testResult', 'success', '✅ Health Check Successful', 
+                        `Server is responding correctly. Response: ${data}`, {
+                            status: response.status,
+                            statusText: response.statusText,
+                            data: data
+                        });
+                } else {
+                    showResult('testResult', 'error', '❌ Health Check Failed', 
+                        `Server returned status: ${response.status}`, {
+                            status: response.status,
+                            statusText: response.statusText,
+                            data: data
+                        });
+                }
+            } catch (error) {
+                showResult('testResult', 'error', '❌ Connection Error', 
+                    `Cannot connect to server: ${error.message}`);
+            } finally {
+                hideLoading('healthBtn');
+            }
+        }
+
+        async function testDatabase() {
+            showLoading('dbBtn');
+            try {
+                const response = await fetch(`${BASE_URL}/health/check-db`);
+                let data;
+                
+                try {
+                    data = await response.json();
+                } catch {
+                    data = await response.text();
+                }
+                
+                if (response.ok) {
+                    showResult('testResult', 'success', '✅ Database Connection Successful', 
+                        'Database is connected and responding.', {
+                            status: response.status,
+                            data: data
+                        });
+                } else {
+                    showResult('testResult', 'error', '❌ Database Connection Failed', 
+                        `Database check returned status: ${response.status}. This could be due to authentication issues or database configuration.`, {
+                            status: response.status,
+                            data: data
+                        });
+                }
+            } catch (error) {
+                showResult('testResult', 'error', '❌ Connection Error', 
+                    `Cannot connect to server: ${error.message}`);
+            } finally {
+                hideLoading('dbBtn');
+            }
+        }
+
+        async function testError() {
+            showLoading('errorBtn');
+            try {
+                const response = await fetch(`${BASE_URL}/health/throw`);
+                const data = await response.text();
+                
+                // This endpoint should throw an error, so we expect non-200 status
+                if (!response.ok) {
+                    showResult('testResult', 'success', '✅ Error Handling Test Successful', 
+                        'Error endpoint correctly returned an error response as expected.', {
+                            status: response.status,
+                            statusText: response.statusText,
+                            error: data
+                        });
+                } else {
+                    showResult('testResult', 'error', '⚠️ Unexpected Response', 
+                        'Error endpoint returned success instead of error.', {
+                            status: response.status,
+                            data: data
+                        });
+                }
+            } catch (error) {
+                showResult('testResult', 'error', '❌ Connection Error', 
+                    `Cannot connect to server: ${error.message}`);
+            } finally {
+                hideLoading('errorBtn');
+            }
+        }
+
+        async function checkRedis() {
+            showLoading('redisBtn');
+            try {
+                // We don't have a Redis test endpoint yet, so we'll check if cache is working
+                // by making a request and checking headers
+                const response = await fetch(`${BASE_URL}/health`);
+                const cacheHeader = response.headers.get('x-cache');
+                
+                showResult('testResult', 'success', '🔍 Cache Status Check', 
+                    'Cache headers analysis. Note: Redis cache status requires server-side logging.', {
+                        status: response.status,
+                        cacheHeader: cacheHeader || 'Not present',
+                        headers: Object.fromEntries([...response.headers.entries()])
+                    });
+            } catch (error) {
+                showResult('testResult', 'error', '❌ Connection Error', 
+                    `Cannot connect to server: ${error.message}`);
+            } finally {
+                hideLoading('redisBtn');
+            }
+        }
+
+        async function testChat() {
+            const message = document.getElementById('chatMessage').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!message) {
+                alert('Please enter a message for the AI');
+                return;
+            }
+            
+            if (!apiKey) {
+                alert('Please enter your API key for OpenRouter access');
+                return;
+            }
+            
+            showLoading('chatBtn');
+            addChatMessage('user', message);
+            
+            try {
+                const requestBody = {
+                    model: "LYNXAI.01",
+                    messages: [
+                        {
+                            role: "user",
+                            content: message
+                        }
+                    ],
+                    max_tokens: 500
+                };
+                
+                const response = await fetch(`${BASE_URL}/openrouter/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                let responseData;
+                try {
+                    responseData = await response.json();
+                } catch {
+                    responseData = await response.text();
+                }
+                
+                if (response.ok) {
+                    const aiResponse = responseData.data?.choices?.[0]?.message?.content || 
+                                     responseData.choices?.[0]?.message?.content ||
+                                     responseData.message ||
+                                     JSON.stringify(responseData);
+                    
+                    addChatMessage('ai', aiResponse);
+                    
+                    showResult('chatResult', 'success', '✅ AI Chat Successful', 
+                        'Received response from OpenRouter AI.', {
+                            status: response.status,
+                            response: responseData
+                        });
+                } else {
+                    showResult('chatResult', 'error', '❌ AI Chat Failed', 
+                        `OpenRouter API returned error: ${response.status}`, {
+                            status: response.status,
+                            error: responseData
+                        });
+                }
+            } catch (error) {
+                showResult('chatResult', 'error', '❌ Connection Error', 
+                    `Cannot connect to OpenRouter API: ${error.message}`);
+            } finally {
+                hideLoading('chatBtn');
+            }
+        }
+
+        function clearChat() {
+            const messagesDiv = document.getElementById('chatMessages');
+            messagesDiv.innerHTML = `
+                <div class="message ai">
+                    <div class="role">AI Assistant</div>
+                    <div class="content">Hello! I'm your AI assistant powered by OpenRouter. Enter a message above to start chatting!</div>
+                </div>
+            `;
+            chatHistory = [];
+            document.getElementById('chatResult').style.display = 'none';
+        }
+
+        async function checkAllServices() {
+            const statusDiv = document.getElementById('systemStatus');
+            statusDiv.className = 'result';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<h4>🔍 Checking All Services...</h4><p>Testing server, database, and Redis connections...</p>';
+            
+            const services = [
+                { name: 'Server', url: '/health', method: 'GET' },
+                { name: 'Database', url: '/health/check-db', method: 'GET' },
+                { name: 'Redis Cache', action: 'check_cache' }
+            ];
+            
+            let results = [];
+            
+            // Test server
+            try {
+                const response = await fetch(`${BASE_URL}/health`);
+                results.push({
+                    service: 'Server',
+                    status: response.ok ? '✅ Online' : '❌ Error',
+                    details: `Status: ${response.status}`
+                });
+            } catch {
+                results.push({
+                    service: 'Server',
+                    status: '❌ Offline',
+                    details: 'Cannot connect to server'
+                });
+            }
+            
+            // Test database
+            try {
+                const response = await fetch(`${BASE_URL}/health/check-db`);
+                results.push({
+                    service: 'Database',
+                    status: response.ok ? '✅ Online' : '⚠️ Warning',
+                    details: `Status: ${response.status}`
+                });
+            } catch {
+                results.push({
+                    service: 'Database',
+                    status: '❌ Error',
+                    details: 'Cannot test database'
+                });
+            }
+            
+            // Redis status (simulated since we don't have an endpoint)
+            results.push({
+                service: 'Redis Cache',
+                status: '🔍 Unknown',
+                details: 'Requires server-side logging to verify'
+            });
+            
+            // Update server status indicator
+            const serverStatusDiv = document.getElementById('serverStatus');
+            const serverResult = results.find(r => r.service === 'Server');
+            
+            if (serverResult.status.includes('✅')) {
+                serverStatusDiv.className = 'status-indicator online';
+                serverStatusDiv.innerHTML = '<span class="status-dot online"></span><span>Server Online</span>';
+            } else if (serverResult.status.includes('❌')) {
+                serverStatusDiv.className = 'status-indicator offline';
+                serverStatusDiv.innerHTML = '<span class="status-dot offline"></span><span>Server Offline</span>';
+            }
+            
+            // Display results
+            let html = '<h4>📊 Service Status Report</h4>';
+            html += '<table style="width:100%; border-collapse: collapse; margin-top: 10px;">';
+            html += '<tr style="background: #f8f9fa;"><th style="padding: 10px; text-align: left;">Service</th><th style="padding: 10px; text-align: left;">Status</th><th style="padding: 10px; text-align: left;">Details</th></tr>';
+            
+            results.forEach(result => {
+                const statusColor = result.status.includes('✅') ? '#48bb78' : 
+                                   result.status.includes('❌') ? '#f56565' : 
+                                   result.status.includes('⚠️') ? '#d69e2e' : '#a0aec0';
+                
+                html += `<tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-weight: 600;">${result.service}</td>
+                    <td style="padding: 10px; color: ${statusColor};">${result.status}</td>
+                    <td style="padding: 10px;">${result.details}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            statusDiv.innerHTML = html;
+        }
+
+        async function getServerInfo() {
+            const statusDiv = document.getElementById('systemStatus');
+            statusDiv.className = 'result';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<h4>🔍 Getting Server Information...</h4>';
+            
+            try {
+                // Try to fetch server info from health endpoint
+                const response = await fetch(`${BASE_URL}/health`);
+                
+                showResult('systemStatus', 'success', '📋 Server Information', 
+                    'Basic server information retrieved.', {
+                        serverStatus: 'Online',
+                        baseUrl: BASE_URL,
+                        responseStatus: response.status,
+                        responseType: response.headers.get('content-type'),
+                        corsEnabled: response.headers.get('access-control-allow-origin') ? 'Yes' : 'No',
+                        timestamp: new Date().toISOString()
+                    });
+            } catch (error) {
+                showResult('systemStatus', 'error', '❌ Server Information Unavailable', 
+                    `Cannot retrieve server information: ${error.message}`);
+            }
+        }
+
+        // Initialize - check server status on load
+        window.addEventListener('load', function() {
+            // Auto-check server status after 1 second
+            setTimeout(() => {
+                fetch(`${BASE_URL}/health`)
+                    .then(response => {
+                        const statusDiv = document.getElementById('serverStatus');
+                        if (response.ok) {
+                            statusDiv.className = 'status-indicator online';
+                            statusDiv.innerHTML = '<span class="status-dot online"></span><span>Server Online</span>';
+                        } else {
+                            statusDiv.className = 'status-indicator offline';
+                            statusDiv.innerHTML = '<span class="status-dot offline"></span><span>Server Error</span>';
+                        }
+                    })
+                    .catch(() => {
+                        const statusDiv = document.getElementById('serverStatus');
+                        statusDiv.className = 'status-indicator offline';
+                        statusDiv.innerHTML = '<span class="status-dot offline"></span><span>Server Offline</span>';
+                    });
+            }, 1000);
+            
+            // Log for debugging
+            console.log('Model Lynx AI Server Test Dashboard loaded');
+            console.log('Base URL:', BASE_URL);
+            console.log('Features available: Health API, OpenRouter Proxy, Database, Cache, Auth');
+        });
+    </script>
+</body>
+</html>

@@ -49,14 +49,16 @@ export const configDb = registerAs(
     };
 
     if (isSupabase) {
-      // Try without SSL first for testing
-      sslConfig = false;
-      // Alternatively, try with require: false
+      // For Supabase, we need SSL with specific configuration
+      console.log(`[🔍] [database.config] [configDb] [sslConfig]: Configuring SSL for Supabase`);
+      sslConfig = { rejectUnauthorized: false };
+      
+      // Alternatively, we can try different SSL modes
       extraConfig = {
         ...extraConfig,
         ssl: {
           rejectUnauthorized: false,
-          require: false,
+          require: true,
         },
       };
     }

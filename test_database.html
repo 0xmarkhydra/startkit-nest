@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Database Connection</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .connection-info {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .url-display {
+            background: #e8f4fc;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .connected { background: #2ecc71; }
+        .disconnected { background: #e74c3c; }
+        .checking { background: #f39c12; }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Database Connection Test</h1>
+        <p>This tool helps debug database connection issues to Supabase PostgreSQL.</p>
+        
+        <div class="connection-info">
+            <h3>Connection Details</h3>
+            <div class="url-display" id="connectionUrl">Loading connection URL...</div>
+            <div class="status">
+                <div class="status-dot disconnected" id="statusDot"></div>
+                <span id="statusText">Status: Not connected</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test Connection</h3>
+            <p>Click the button below to test the database connection:</p>
+            <button id="testButton" onclick="testConnection()">Test Database Connection</button>
+            <button id="decodeButton" onclick="decodePassword()">Decode Password</button>
+            
+            <div id="loading" style="display: none;">
+                <div class="loading"></div> Testing connection...
+            </div>
+            
+            <div id="result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Connection Parameters Analysis</h3>
+            <p>Check if your connection URL has been parsed correctly:</p>
+            <button onclick="analyzeConnection()">Analyze Connection Parameters</button>
+            <pre id="analysisResult" style="display: none;"></pre>
+        </div>
+        
+        <div class="test-section">
+            <h3>Troubleshooting Steps</h3>
+            <ol>
+                <li>Make sure the password doesn't contain special characters that need escaping</li>
+                <li>Check if SSL is required (Supabase usually requires SSL)</li>
+                <li>Verify that the database name is correct</li>
+                <li>Check network connectivity to the Supabase host</li>
+            </ol>
+            <p>Common issue: The error "SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature is missing" often indicates an authentication problem, possibly due to incorrect password or SSL configuration.</p>
+        </div>
+    </div>
+
+    <script>
+        // Database URL from the .env file
+        const databaseUrl = "postgresql://postgres.owzloztqmyfxupqtccdw:S211199%40gmail.com@aws-0-ap-southeast-1.pooler.supabase.com:5432/model_lynx_ai";
+        
+        // Display the connection URL (mask password for security)
+        const displayUrl = databaseUrl.replace(/:([^:@]+)@/, ':***@');
+        document.getElementById('connectionUrl').textContent = displayUrl;
+        
+        // Helper function to parse URL
+        function parseDatabaseUrl(url) {
+            try {
+                const parsedUrl = new URL(url);
+                const decodedPassword = decodeURIComponent(parsedUrl.password);
+                
+                return {
+                    host: parsedUrl.hostname,
+                    port: parsedUrl.port ? Number(parsedUrl.port) : 5432,
+                    username: parsedUrl.username,
+                    password: decodedPassword,
+                    passwordEncoded: parsedUrl.password,
+                    database: parsedUrl.pathname.slice(1),
+                    protocol: parsedUrl.protocol.replace(':', '')
+                };
+            } catch (error) {
+                console.error('Error parsing URL:', error);
+                return null;
+            }
+        }
+        
+        // Test the connection by calling the backend API
+        async function testConnection() {
+            const testButton = document.getElementById('testButton');
+            const loading = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+            
+            testButton.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.style.display = 'none';
+            
+            try {
+                // We'll make a simple fetch request to test the connection
+                // Since we can't directly connect to PostgreSQL from browser,
+                // we'll call a test endpoint if available, or just show parsing results
+                const parsed = parseDatabaseUrl(databaseUrl);
+                
+                if (!parsed) {
+                    throw new Error('Failed to parse database URL');
+                }
+                
+                // Update status
+                document.getElementById('statusDot').className = 'status-dot checking';
+                document.getElementById('statusText').textContent = 'Status: Testing connection...';
+                
+                // Test with a fetch to a hypothetical test endpoint
+                // For now, we'll simulate a test by checking if the URL is valid
+                const testResult = {
+                    success: true,
+                    message: 'URL parsed successfully. Unable to test actual database connection from browser.',
+                    data: {
+                        host: parsed.host,
+                        port: parsed.port,
+                        username: parsed.username,
+                        passwordLength: parsed.password.length,
+                        database: parsed.database,
+                        hasSpecialChars: /[@%&+\/?=:#]/.test(parsed.passwordEncoded)
+                    }
+                };
+                
+                // Show result
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✓ Connection URL Parsed Successfully</h4>
+                    <p>${testResult.message}</p>
+                    <pre>${JSON.stringify(testResult.data, null, 2)}</pre>
+                    <p><strong>Note:</strong> Actual database connection test requires server-side code.</p>
+                `;
+                resultDiv.style.display = 'block';
+                
+                // Update status (we can't know actual connection status from browser)
+                document.getElementById('statusDot').className = 'status-dot checking';
+                document.getElementById('statusText').textContent = 'Status: URL parsed - connection test requires server';
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>✗ Connection Test Failed</h4>
+                    <p>Error: ${error.message}</p>
+                    <p>Check your database URL format.</p>
+                `;
+                resultDiv.style.display = 'block';
+                
+                document.getElementById('statusDot').className = 'status-dot disconnected';
+                document.getElementById('statusText').textContent = 'Status: URL parsing failed';
+            } finally {
+                testButton.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+        
+        function decodePassword() {
+            const parsed = parseDatabaseUrl(databaseUrl);
+            if (parsed) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>Password Analysis</h4>
+                    <p><strong>Encoded password:</strong> ${parsed.passwordEncoded}</p>
+                    <p><strong>Decoded password:</strong> ${parsed.password}</p>
+                    <p><strong>Length:</strong> ${parsed.password.length} characters</p>
+                    <p><strong>Contains @ symbol:</strong> ${parsed.password.includes('@') ? 'YES (this might be the issue - @ should be %40)' : 'NO'}</p>
+                    <p><strong>Special characters:</strong> ${/[!@#$%^&*(),.?":{}|<>]/.test(parsed.password) ? 'YES' : 'NO'}</p>
+                `;
+                resultDiv.style.display = 'block';
+            }
+        }
+        
+        function analyzeConnection() {
+            const parsed = parseDatabaseUrl(databaseUrl);
+            const analysisResult = document.getElementById('analysisResult');
+            
+            if (parsed) {
+                const analysis = {
+                    originalUrl: databaseUrl,
+                    parsed: parsed,
+                    potentialIssues: [],
+                    recommendations: []
+                };
+                
+                // Check for potential issues
+                if (parsed.password.includes('@')) {
+                    analysis.potentialIssues.push('Password contains @ symbol which might cause authentication issues');
+                    analysis.recommendations.push('Ensure @ is properly encoded as %40 in the password');
+                }
+                
+                if (parsed.host.includes('supabase')) {
+                    analysis.recommendations.push('Supabase requires SSL connection - ensure ssl: { rejectUnauthorized: false } is set');
+                    analysis.recommendations.push('Use port 5432 for Supabase PostgreSQL');
+                }
+                
+                if (parsed.password.length > 50) {
+                    analysis.potentialIssues.push('Password is very long, might have encoding issues');
+                }
+                
+                analysisResult.textContent = JSON.stringify(analysis, null, 2);
+                analysisResult.style.display = 'block';
+            }
+        }
+        
+        // Initialize
+        window.onload = function() {
+            console.log('Database test tool loaded');
+            console.log('Database URL:', databaseUrl);
+            
+            // Parse and log for debugging
+            const parsed = parseDatabaseUrl(databaseUrl);
+            if (parsed) {
+                console.log('Parsed connection:', {
+                    host: parsed.host,
+                    port: parsed.port,
+                    username: parsed.username,
+                    passwordLength: parsed.password.length,
+                    database: parsed.database
+                });
+                
+                // Check if password has @ symbol
+                if (parsed.password.includes('@')) {
+                    console.warn('Password contains @ symbol. In URL, @ should be encoded as %40.');
+                    console.warn('Original password encoding:', parsed.passwordEncoded);
+                }
+            }
+        };
+    </script>
+</body>
+</html>
