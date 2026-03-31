@@ -12,6 +12,7 @@ import { configAuth } from './configs/auth';
 import { configCache } from './configs/cache';
 import { HttpCacheInterceptor } from './interceptors';
 import { BusinessModule } from '@/business/business.module';
+import { OpenRouterModule } from './openrouter/openrouter.module';
 
 const controllers = [HealthController];
 
@@ -24,6 +25,7 @@ const controllers = [HealthController];
     DatabaseModule,
     QueueModule,
     BusinessModule,
+    OpenRouterModule,
     CacheModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
