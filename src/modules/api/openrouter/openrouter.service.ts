@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ChatCompletionRequestDto } from './dto/chat-completion.dto';
 import { AxiosError } from 'axios';
+import { Readable } from 'stream';
 
 @Injectable()
 export class OpenRouterService {
@@ -14,11 +15,16 @@ export class OpenRouterService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.openRouterApiUrl = this.configService.get<string>('OPENROUTER_API_URL') || 'https://openrouter.ai/api/v1';
-    this.openRouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
+    this.openRouterApiUrl =
+      this.configService.get<string>('OPENROUTER_API_URL') ||
+      'https://openrouter.ai/api/v1';
+    this.openRouterApiKey =
+      this.configService.get<string>('OPENROUTER_API_KEY');
 
     if (!this.openRouterApiKey) {
-      console.error('🔴 [OpenRouterService] [constructor] OPENROUTER_API_KEY is not configured');
+      console.error(
+        '🔴 [OpenRouterService] [constructor] OPENROUTER_API_KEY is not configured',
+      );
     }
   }
 
@@ -75,62 +81,160 @@ export class OpenRouterService {
   private mapModelName(model: string): string {
     // Nếu model đã là tên chuẩn từ OpenRouter, dùng trực tiếp
     if (this.supportedModels.includes(model)) {
-      console.log(`[✅] [OpenRouterService] [mapModelName] Using model: ${model}`);
+      console.log(
+        `[✅] [OpenRouterService] [mapModelName] Using model: ${model}`,
+      );
       return model;
     }
 
     // Nếu model truyền vào là LYNXAI.01, ta sẽ gán cho một model cố định (fallback)
     if (model === 'LYNXAI.01') {
-      console.log(`[🔄] [OpenRouterService] [mapModelName] Mapping ${model} to moonshotai/kimi-k2.5`);
+      console.log(
+        `[🔄] [OpenRouterService] [mapModelName] Mapping ${model} to moonshotai/kimi-k2.5`,
+      );
       return 'moonshotai/kimi-k2.5';
     }
 
     // Nếu không khớp, vẫn truyền thẳng (OpenRouter sẽ xử lý hoặc trả lỗi)
-    console.log(`[⚠️] [OpenRouterService] [mapModelName] Unknown model: ${model}, passing through`);
+    console.log(
+      `[⚠️] [OpenRouterService] [mapModelName] Unknown model: ${model}, passing through`,
+    );
     return model;
   }
 
-  async forwardChatCompletion(requestDto: ChatCompletionRequestDto): Promise<any> {
+  /**
+   * Build payload chuẩn OpenAI từ request DTO.
+   * Giữ nguyên tất cả fields mà client gửi lên, chỉ map model name.
+   */
+  private buildPayload(requestDto: ChatCompletionRequestDto): Record<string, any> {
     const targetModel = this.mapModelName(requestDto.model);
 
-    // Chuẩn bị payload để gọi OpenRouter
-    const payload = {
+    // Spread tất cả fields từ DTO, override model đã map
+    const payload: Record<string, any> = {
       ...requestDto,
-      model: targetModel, // Sử dụng model đã được map
+      model: targetModel,
     };
 
-    console.log(`[🔄] [OpenRouterService] [forwardChatCompletion] Bắt đầu gọi OpenRouter API cho model: ${targetModel}`);
+    // Loại bỏ undefined fields để tránh gửi thừa
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === undefined) {
+        delete payload[key];
+      }
+    });
+
+    return payload;
+  }
+
+  /**
+   * Build common headers cho request đến OpenRouter
+   */
+  private buildHeaders(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this.openRouterApiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://lynxai.com',
+      'X-Title': 'LynxAI Forwarder',
+    };
+  }
+
+  /**
+   * Forward chat completion (non-streaming)
+   * Trả về response data đúng chuẩn OpenAI format
+   */
+  async forwardChatCompletion(
+    requestDto: ChatCompletionRequestDto,
+  ): Promise<any> {
+    const payload = this.buildPayload(requestDto);
+
+    console.log(
+      `[🔄] [OpenRouterService] [forwardChatCompletion] Calling OpenRouter API - model: ${payload.model}`,
+    );
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.openRouterApiUrl}/chat/completions`, payload, {
-          headers: {
-            'Authorization': `Bearer ${this.openRouterApiKey}`,
-            'Content-Type': 'application/json',
-            // HTTP-Referer và X-Title là tuỳ chọn cho OpenRouter để xếp hạng
-            'HTTP-Referer': 'https://lynxai.com', 
-            'X-Title': 'LynxAI Forwarder',
-          },
-        })
+        this.httpService.post(
+          `${this.openRouterApiUrl}/chat/completions`,
+          payload,
+          { headers: this.buildHeaders() },
+        ),
       );
 
-      console.log(`[✅] [OpenRouterService] [forwardChatCompletion] Thành công`);
+      console.log(
+        `[✅] [OpenRouterService] [forwardChatCompletion] Success`,
+      );
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
-      
-      console.error(`[🔴] [OpenRouterService] [forwardChatCompletion] Lỗi khi gọi OpenRouter API:`, 
-        axiosError.response?.data || axiosError.message);
 
-      // Trả về một HttpException với thông tin lỗi phù hợp từ OpenRouter (nếu có)
-      const statusCode = axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
-      const errorMessage = axiosError.response?.data || 'An error occurred while communicating with OpenRouter';
+      console.error(
+        `[🔴] [OpenRouterService] [forwardChatCompletion] Error:`,
+        axiosError.response?.data || axiosError.message,
+      );
+
+      const statusCode =
+        axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorData = axiosError.response?.data || {
+        error: {
+          message: 'An error occurred while communicating with OpenRouter',
+          type: 'api_error',
+        },
+      };
+
+      throw new HttpException(errorData, statusCode);
+    }
+  }
+
+  /**
+   * Forward chat completion (streaming via SSE)
+   * Trả về một Readable stream để controller pipe về client
+   */
+  async forwardChatCompletionStream(
+    requestDto: ChatCompletionRequestDto,
+  ): Promise<Readable> {
+    const payload = this.buildPayload(requestDto);
+    // Đảm bảo stream = true trong payload
+    payload.stream = true;
+
+    console.log(
+      `[🔄] [OpenRouterService] [forwardChatCompletionStream] Calling OpenRouter API (stream) - model: ${payload.model}`,
+    );
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.openRouterApiUrl}/chat/completions`,
+          payload,
+          {
+            headers: this.buildHeaders(),
+            responseType: 'stream',
+          },
+        ),
+      );
+
+      console.log(
+        `[✅] [OpenRouterService] [forwardChatCompletionStream] Stream connected`,
+      );
+      return response.data as Readable;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      console.error(
+        `[🔴] [OpenRouterService] [forwardChatCompletionStream] Error:`,
+        axiosError.response?.data || axiosError.message,
+      );
+
+      const statusCode =
+        axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorMessage =
+        axiosError.message ||
+        'An error occurred while communicating with OpenRouter';
 
       throw new HttpException(
         {
-          statusCode,
-          message: 'Failed to forward request to OpenRouter',
-          data: errorMessage,
+          error: {
+            message: `Failed to start stream: ${errorMessage}`,
+            type: 'api_error',
+          },
         },
         statusCode,
       );

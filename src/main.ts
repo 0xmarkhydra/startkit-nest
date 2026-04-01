@@ -18,6 +18,10 @@ async function bootstrap() {
   });
 
   if (isApi) {
+    // Tăng giới hạn body size để hỗ trợ Cursor IDE và các client gửi payload lớn
+    app.use(express.json({ limit: '50mb' }));
+    app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
     // const corsOrigin = process.env.CORS_ORIGIN.split(',') || [
     //   'http://localhost:3000',
     // ];
