@@ -143,17 +143,28 @@ export class OpenRouterService {
     payload.max_tokens = cappedTokens;
     delete payload.max_completion_tokens;
 
-    // Xóa các mảng công cụ (tools) không chuẩn vì Kimi cực kỳ khắt khe báo lỗi 400 
-    // "unknown tool type: , currently only function and plugin are supported"
-    if (this.activeProvider === 'moonshot') {
-      delete payload.tools;
-      delete payload.tool_choice;
+    // Lọc mảng tools (Agentic Cursor Tools) để Kimi không báo lỗi 400 "unknown tool type"
+    // Kimi chỉ hiểu "function" và "plugin". Bất kỳ tools nào gửi từ Cursor có type rỗng hoặc bằng "shell" (nếu có) bị từ chối
+    if (this.activeProvider === 'moonshot' && Array.isArray(payload.tools)) {
+      payload.tools = payload.tools.filter(
+        (tool: any) => tool && typeof tool.type === 'string' && (tool.type === 'function' || tool.type === 'plugin')
+      );
+      // Nếu lọc xong mà không còn tool nào hợp lệ thì thà xóa cmn mảng tools đi để nó chạy dạng Chat thường
+      if (payload.tools.length === 0) {
+        delete payload.tools;
+        delete payload.tool_choice;
+      } else {
+        // Nếu tool_choice không được support kiểu auto, có thể xóa đi để tự quyết định
+        // delete payload.tool_choice;
+      }
       
-      // Xóa tất cả các message có role là "tool" hoặc chứa "tool_calls" để chống mầm mống lỗi
+      // Cleanup mảng message role "tool" nếu có tool calls bị hỏng (tuỳ chọn an toàn cho Stream)
       if (Array.isArray(payload.messages)) {
-        payload.messages = payload.messages.filter(msg => msg.role !== 'tool');
         payload.messages.forEach(msg => {
-          if (msg.tool_calls) delete msg.tool_calls;
+          if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+             msg.tool_calls = msg.tool_calls.filter((tc: any) => tc.type === 'function' || tc.type === 'plugin');
+             if (msg.tool_calls.length === 0) delete msg.tool_calls;
+          }
         });
       }
     }
