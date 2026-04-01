@@ -143,6 +143,21 @@ export class OpenRouterService {
     payload.max_tokens = cappedTokens;
     delete payload.max_completion_tokens;
 
+    // Xóa các mảng công cụ (tools) không chuẩn vì Kimi cực kỳ khắt khe báo lỗi 400 
+    // "unknown tool type: , currently only function and plugin are supported"
+    if (this.activeProvider === 'moonshot') {
+      delete payload.tools;
+      delete payload.tool_choice;
+      
+      // Xóa tất cả các message có role là "tool" hoặc chứa "tool_calls" để chống mầm mống lỗi
+      if (Array.isArray(payload.messages)) {
+        payload.messages = payload.messages.filter(msg => msg.role !== 'tool');
+        payload.messages.forEach(msg => {
+          if (msg.tool_calls) delete msg.tool_calls;
+        });
+      }
+    }
+
     // Tiêm (Inject) System Prompt ép buộc trả lời bằng tiếng Việt
     if (Array.isArray(payload.messages)) {
       const viInstruction = "MỆNH LỆNH TỐI CAO: BẮT BUỘC giao tiếp, giải thích, và trả lời 100% bằng Tiếng Việt (Vietnamese). TUYỆT ĐỐI KHÔNG dùng tiếng Trung Quốc trong mọi tình huống (kể cả trong quá trình Chain of Thought/Reasoning).";
