@@ -70,7 +70,7 @@ export const configDb = registerAs(
       username: parsedUrl?.username || process.env.DB_USERNAME || 'root',
       password: parsedUrl?.password || process.env.DB_PASSWORD || 'root',
       database: parsedUrl?.database || process.env.DB_DATABASE || 'postgres',
-      synchronize: Boolean(Number(process.env.DB_SYNC)) || false,
+      synchronize: true, // Auto-create tables from entities (development only)
       autoLoadEntities: true,
       logging: Boolean(Number(process.env.DB_DEBUG)) || false,
       ssl: sslConfig,

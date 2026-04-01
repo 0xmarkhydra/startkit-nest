@@ -1,15 +1,15 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Inject } from '@nestjs/common';
 import { Request } from 'express';
+import { ApiKeyService } from '@/api/services/api-key.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  // TODO: Tích hợp với Database để kiểm tra key thật thay vì hardcode
-  private validKeys = [
-    'sk-lynxai-test-key-1',
-    'sk-lynxai-test-key-2'
-  ];
+  constructor(
+    @Inject(ApiKeyService)
+    private readonly apiKeyService: ApiKeyService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const apiKey = this.extractKeyFromHeader(request);
 
@@ -17,12 +17,16 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('API Key is missing');
     }
 
-    if (!this.isValidApiKey(apiKey)) {
+    const validationResult = await this.apiKeyService.validateKey(apiKey);
+
+    if (!validationResult.isValid) {
       throw new UnauthorizedException('Invalid API Key');
     }
 
-    // Gắn thông tin apiKey vào request để có thể dùng về sau nếu cần
+    // Attach apiKey info to request for later use
     request['apiKey'] = apiKey;
+    request['apiKeyId'] = validationResult.apiKeyId;
+    request['userId'] = validationResult.userId;
 
     return true;
   }
@@ -30,9 +34,5 @@ export class ApiKeyGuard implements CanActivate {
   private extractKeyFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;
-  }
-
-  private isValidApiKey(apiKey: string): boolean {
-    return this.validKeys.includes(apiKey);
   }
 }

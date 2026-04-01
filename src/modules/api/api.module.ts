@@ -2,7 +2,7 @@ import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { DatabaseModule } from '@/database';
 import { HealthController } from '@/api/controllers';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import { QueueModule } from '@/queue/queue.module';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -13,8 +13,18 @@ import { configCache } from './configs/cache';
 import { HttpCacheInterceptor } from './interceptors';
 import { BusinessModule } from '@/business/business.module';
 import { OpenRouterModule } from './openrouter/openrouter.module';
+import { AuthController } from '@/api/controllers/auth.controller';
+import { ApiKeyController } from '@/api/controllers/api-key.controller';
+import { LogController } from '@/api/controllers/log.controller';
+import { AuthService } from '@/api/services/auth.service';
+import { ApiKeyService } from '@/api/services/api-key.service';
+import { RequestLogService } from '@/api/services/request-log.service';
+import { ApiKeyRepository, UserRepository, RequestLogRepository } from '@/database/repositories';
+import { JwtStrategy } from '@/api/strategies/jwt.strategy';
 
-const controllers = [HealthController];
+const controllers = [HealthController, AuthController, ApiKeyController, LogController];
+const services = [AuthService, ApiKeyService, RequestLogService];
+const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
 
 @Module({
   imports: [
@@ -133,9 +143,12 @@ const controllers = [HealthController];
       provide: APP_INTERCEPTOR,
       useClass: HttpCacheInterceptor,
     },
-    // ...services,
+    ...services,
+    ...repositories,
+    JwtStrategy,
+    JwtService,
   ],
-  exports: [],
+  exports: [...services],
 })
 export class ApiModule implements OnApplicationBootstrap {
   constructor() {}

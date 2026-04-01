@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: "3"
     content: Tạo Auth module với login/register JWT endpoints
-    status: in_progress
+    status: completed
   - id: "4"
     content: Bật lại và cấu hình JwtAuthGuard để bảo vệ các routes
-    status: pending
+    status: completed
   - id: "5"
     content: Tạo ApiKey entity liên kết với User (user có thể tạo nhiều key)
     status: completed
@@ -22,28 +22,28 @@ todos:
     status: completed
   - id: "7"
     content: "Tạo ApiKey controller với endpoints: tạo, liệt kê, xóa key"
-    status: pending
+    status: completed
   - id: "8"
     content: "Tạo ApiKey service với logic tạo key (format: sk-lynxai-<prefix>-<uuid>)"
-    status: pending
+    status: completed
   - id: "9"
     content: Refactor ApiKeyGuard để kiểm tra key từ database thay vì hardcode
-    status: pending
+    status: completed
   - id: "10"
     content: Tạo RequestLog entity để lưu lịch sử gọi API
     status: completed
   - id: "11"
     content: Tạo Logging interceptor để ghi log request/response
-    status: pending
+    status: completed
   - id: "12"
     content: Cập nhật OpenRouterService để ghi log sau mỗi request (token usage, cost)
-    status: pending
+    status: completed
   - id: "13"
     content: Tạo Log controller đ�� user xem lịch sử sử dụng của họ
-    status: pending
+    status: completed
   - id: "14"
     content: Chạy migration và test hệ thống tích hợp
-    status: pending
+    status: in_progress
 isProject: false
 ---
 
