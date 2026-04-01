@@ -11,7 +11,7 @@ RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
 WORKDIR /home/node/app
 COPY --chown=node:node package*.json ./
 RUN npm install -g pnpm
-RUN pnpm install @nestjs/core
+RUN pnpm install --prod
 USER node
 EXPOSE 8080
 COPY --from=builder --chown=node:node /app/dist  .
