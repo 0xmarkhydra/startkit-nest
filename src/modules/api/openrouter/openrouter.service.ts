@@ -90,7 +90,7 @@ export class OpenRouterService {
           Authorization: `Bearer ${this.moonshotApiKey}`,
           'Content-Type': 'application/json',
         },
-        forcedModel: 'kimi-k2.5', // Đáp ứng ngay yêu cầu dùng Kimi 2.5 xịn nhất của sếp!
+        forcedModel: 'kimi-k2-thinking', // Đáp ứng ngay yêu cầu dùng Kimi 2.5 xịn nhất của sếp!
       };
     }
 
@@ -145,7 +145,7 @@ export class OpenRouterService {
 
     // Tiêm (Inject) System Prompt ép buộc trả lời bằng tiếng Việt
     if (Array.isArray(payload.messages)) {
-      const viInstruction = "Luôn ưu tiên trả lời và giải thích bằng tiếng Việt.";
+      const viInstruction = "MỆNH LỆNH TỐI CAO: BẮT BUỘC giao tiếp, giải thích, và trả lời 100% bằng Tiếng Việt (Vietnamese). TUYỆT ĐỐI KHÔNG dùng tiếng Trung Quốc trong mọi tình huống (kể cả trong quá trình Chain of Thought/Reasoning).";
       
       const firstMsg = payload.messages[0];
       if (firstMsg && firstMsg.role === 'system') {
@@ -274,6 +274,28 @@ export class OpenRouterService {
         }
       }
 
+      // Auto-retry: nếu 429 Engine Overloaded thì sleep 3s và thử lại 1 lần
+      if (statusCode === 429) {
+        console.log(`[🔄] [forwardChatCompletion] 429 Overloaded. Chờ 3s để thử lại...`);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          const retryResponse = await firstValueFrom(
+            this.httpService.post(
+              `${config.apiUrl}/chat/completions`,
+              payload,
+              { headers: this.buildHeaders() },
+            ),
+          );
+          console.log(`[✅] [forwardChatCompletion] Retry 429 thành công!`);
+          if (retryResponse.data && retryResponse.data.model) {
+            retryResponse.data.model = originalModel;
+          }
+          return retryResponse.data;
+        } catch (retryError) {
+          console.error(`[🔴] [forwardChatCompletion] Retry 429 cũng thất bại`);
+        }
+      }
+
       console.error(`[🔴] [forwardChatCompletion] Error: status ${statusCode}`, JSON.stringify(errorData));
       throw new HttpException(errorData, statusCode);
     }
@@ -336,6 +358,28 @@ export class OpenRouterService {
           } catch (retryError) {
             console.error(`[🔴] [forwardChatCompletionStream] Retry also failed`);
           }
+        }
+      }
+
+      // Auto-retry: nếu 429 Engine Overloaded thì sleep 3s và thử lại 1 lần
+      if (statusCode === 429) {
+        console.log(`[🔄] [forwardChatCompletionStream] 429 Overloaded. Chờ 3s để thử lại...`);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          const retryResponse = await firstValueFrom(
+            this.httpService.post(
+              `${config.apiUrl}/chat/completions`,
+              payload,
+              {
+                headers: this.buildHeaders(),
+                responseType: 'stream',
+              },
+            ),
+          );
+          console.log(`[✅] [forwardChatCompletionStream] Retry 429 thành công!`);
+          return retryResponse.data as Readable;
+        } catch (retryError) {
+          console.error(`[🔴] [forwardChatCompletionStream] Retry 429 cũng thất bại`);
         }
       }
 
