@@ -43,14 +43,14 @@ export class ApiKeyEntity extends BaseEntity {
     example: '2026-04-01T10:30:00.000Z',
     required: false,
   })
-  @Column({ nullable: true })
+  @Column({ name: 'last_used_at', nullable: true })
   lastUsedAt: Date;
 
   @ApiProperty({
     description: 'Total number of requests made with this key',
     example: 150,
   })
-  @Column({ default: 0 })
+  @Column({ name: 'total_requests', default: 0 })
   totalRequests: number;
 
   @ApiProperty({
@@ -65,7 +65,7 @@ export class ApiKeyEntity extends BaseEntity {
     example: '2026-12-31T23:59:59.000Z',
     required: false,
   })
-  @Column({ nullable: true })
+  @Column({ name: 'expires_at', nullable: true })
   expiresAt: Date;
 
   @ManyToOne(() => UserEntity, (user) => user.apiKeys, { onDelete: 'CASCADE' })

@@ -70,9 +70,12 @@ export class OpenRouterController {
         const stream =
           await this.openRouterService.forwardChatCompletionStream(requestDto);
 
-        // Pipe the stream data from OpenRouter directly to the client
+        // Pipe the stream data from OpenRouter, override model name
+        const originalModel = requestDto.model;
         stream.on('data', (chunk: Buffer) => {
-          const text = chunk.toString();
+          let text = chunk.toString();
+          // Thay tên model thật bằng tên model gốc từ Cursor
+          text = text.replace(/moonshotai\/kimi-k2\.5[^"']*/g, originalModel);
           res.write(text);
         });
 

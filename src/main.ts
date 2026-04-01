@@ -33,7 +33,11 @@ async function bootstrap() {
     });
 
     app.useLogger(app.get(PinoLogger));
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    app.useGlobalPipes(new ValidationPipe({
+      transform: true,
+      whitelist: false,           // Không xóa extra fields
+      forbidNonWhitelisted: false, // Không throw khi có extra fields
+    }));
     app.useGlobalFilters(new GlobalExceptionFilter(true, true));
 
     // Serve static files from public directory

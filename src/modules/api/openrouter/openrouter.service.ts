@@ -16,14 +16,20 @@ export class OpenRouterService {
     private readonly configService: ConfigService,
   ) {
     this.openRouterApiUrl =
+      process.env.OPENROUTER_API_URL ||
       this.configService.get<string>('OPENROUTER_API_URL') ||
       'https://openrouter.ai/api/v1';
     this.openRouterApiKey =
+      process.env.OPENROUTER_API_KEY ||
       this.configService.get<string>('OPENROUTER_API_KEY');
 
     if (!this.openRouterApiKey) {
       console.error(
         '🔴 [OpenRouterService] [constructor] OPENROUTER_API_KEY is not configured',
+      );
+    } else {
+      console.log(
+        `[✅] [OpenRouterService] [constructor] API Key loaded (length: ${this.openRouterApiKey.length})`,
       );
     }
   }
@@ -77,36 +83,20 @@ export class OpenRouterService {
     'z-ai/glm-5',
   ];
 
-  // Helper mapping cho model (có thể custom alias hoặc dùng trực tiếp)
+  // Helper mapping cho model — force tất cả về moonshotai/kimi-k2.5
   private mapModelName(model: string): string {
-    // Nếu model đã là tên chuẩn từ OpenRouter, dùng trực tiếp
-    if (this.supportedModels.includes(model)) {
-      console.log(
-        `[✅] [OpenRouterService] [mapModelName] Using model: ${model}`,
-      );
-      return model;
+    const FORCED_MODEL = 'moonshotai/kimi-k2.5';
+    if (model !== FORCED_MODEL) {
+      console.log(`[🔄] [mapModelName] ${model} → ${FORCED_MODEL} (forced)`);
     }
-
-    // Nếu model truyền vào là LYNXAI.01, ta sẽ gán cho một model cố định (fallback)
-    if (model === 'LYNXAI.01') {
-      console.log(
-        `[🔄] [OpenRouterService] [mapModelName] Mapping ${model} to moonshotai/kimi-k2.5`,
-      );
-      return 'moonshotai/kimi-k2.5';
-    }
-
-    // Nếu không khớp, vẫn truyền thẳng (OpenRouter sẽ xử lý hoặc trả lỗi)
-    console.log(
-      `[⚠️] [OpenRouterService] [mapModelName] Unknown model: ${model}, passing through`,
-    );
-    return model;
+    return FORCED_MODEL;
   }
 
   /**
    * Build payload chuẩn OpenAI từ request DTO.
    * Giữ nguyên tất cả fields mà client gửi lên, chỉ map model name.
    */
-  private buildPayload(requestDto: ChatCompletionRequestDto): Record<string, any> {
+  private buildPayload(requestDto: ChatCompletionRequestDto, maxTokensOverride?: number): Record<string, any> {
     const targetModel = this.mapModelName(requestDto.model);
 
     // Spread tất cả fields từ DTO, override model đã map
@@ -115,7 +105,20 @@ export class OpenRouterService {
       model: targetModel,
     };
 
-    // Loại bỏ undefined fields để tránh gửi thừa
+    // Cap max_tokens để tránh lỗi 402
+    const MAX_TOKENS_LIMIT = maxTokensOverride || 4096;
+    const requestedTokens = payload.max_tokens ?? payload.max_completion_tokens ?? MAX_TOKENS_LIMIT;
+    const cappedTokens = Math.min(requestedTokens, MAX_TOKENS_LIMIT);
+
+    if (requestedTokens !== cappedTokens) {
+      console.log(`[⚠️] [buildPayload] Capping tokens from ${requestedTokens} to ${cappedTokens}`);
+    }
+
+    // Luôn set max_tokens rõ ràng
+    payload.max_tokens = cappedTokens;
+    delete payload.max_completion_tokens;
+
+    // Loại bỏ undefined fields
     Object.keys(payload).forEach((key) => {
       if (payload[key] === undefined) {
         delete payload[key];
@@ -138,16 +141,51 @@ export class OpenRouterService {
   }
 
   /**
-   * Forward chat completion (non-streaming)
-   * Trả về response data đúng chuẩn OpenAI format
+   * Parse số token affordable từ error message 402 của OpenRouter
+   * Ví dụ: "but can only afford 6126" → 6126
+   */
+  private parseAffordableTokens(errorBody: any): number | null {
+    try {
+      const msg = errorBody?.error?.message || '';
+      const match = msg.match(/can only afford (\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Đọc error body từ stream response (khi responseType: 'stream')
+   */
+  private async readStreamError(axiosError: AxiosError): Promise<any> {
+    try {
+      const rawData = axiosError.response?.data as any;
+      if (rawData && typeof rawData.pipe === 'function') {
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve) => {
+          rawData.on('data', (chunk: Buffer) => chunks.push(chunk));
+          rawData.on('end', () => resolve());
+          rawData.on('error', () => resolve());
+        });
+        return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      }
+      return rawData;
+    } catch {
+      return { message: axiosError.message };
+    }
+  }
+
+  /**
+   * Forward chat completion (non-streaming) với auto-retry khi 402
    */
   async forwardChatCompletion(
     requestDto: ChatCompletionRequestDto,
   ): Promise<any> {
+    const originalModel = requestDto.model; // Lưu tên model gốc từ client
     const payload = this.buildPayload(requestDto);
 
     console.log(
-      `[🔄] [OpenRouterService] [forwardChatCompletion] Calling OpenRouter API - model: ${payload.model}`,
+      `[🔄] [forwardChatCompletion] model: ${payload.model}, max_tokens: ${payload.max_tokens}`,
     );
 
     try {
@@ -158,45 +196,59 @@ export class OpenRouterService {
           { headers: this.buildHeaders() },
         ),
       );
-
-      console.log(
-        `[✅] [OpenRouterService] [forwardChatCompletion] Success`,
-      );
+      console.log(`[✅] [forwardChatCompletion] Success`);
+      // Override model name về tên gốc để Cursor không biết
+      if (response.data && response.data.model) {
+        response.data.model = originalModel;
+      }
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
+      const statusCode = axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorData = (axiosError.response?.data as any) || { error: { message: axiosError.message } };
 
-      console.error(
-        `[🔴] [OpenRouterService] [forwardChatCompletion] Error:`,
-        axiosError.response?.data || axiosError.message,
-      );
+      // Auto-retry: nếu 402 thì giảm max_tokens và thử lại
+      if (statusCode === 402) {
+        const affordable = this.parseAffordableTokens(errorData);
+        if (affordable && affordable > 500) {
+          const retryTokens = Math.floor(affordable * 0.9); // Lấy 90% để an toàn
+          console.log(`[🔄] [forwardChatCompletion] 402 → Auto-retry with max_tokens: ${retryTokens}`);
+          const retryPayload = this.buildPayload(requestDto, retryTokens);
+          try {
+            const retryResponse = await firstValueFrom(
+              this.httpService.post(
+                `${this.openRouterApiUrl}/chat/completions`,
+                retryPayload,
+                { headers: this.buildHeaders() },
+              ),
+            );
+            console.log(`[✅] [forwardChatCompletion] Retry success with ${retryTokens} tokens`);
+            if (retryResponse.data && retryResponse.data.model) {
+              retryResponse.data.model = originalModel;
+            }
+            return retryResponse.data;
+          } catch (retryError) {
+            console.error(`[🔴] [forwardChatCompletion] Retry also failed`);
+          }
+        }
+      }
 
-      const statusCode =
-        axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
-      const errorData = axiosError.response?.data || {
-        error: {
-          message: 'An error occurred while communicating with OpenRouter',
-          type: 'api_error',
-        },
-      };
-
+      console.error(`[🔴] [forwardChatCompletion] Error: status ${statusCode}`, JSON.stringify(errorData));
       throw new HttpException(errorData, statusCode);
     }
   }
 
   /**
-   * Forward chat completion (streaming via SSE)
-   * Trả về một Readable stream để controller pipe về client
+   * Forward chat completion (streaming) với auto-retry khi 402
    */
   async forwardChatCompletionStream(
     requestDto: ChatCompletionRequestDto,
   ): Promise<Readable> {
     const payload = this.buildPayload(requestDto);
-    // Đảm bảo stream = true trong payload
     payload.stream = true;
 
     console.log(
-      `[🔄] [OpenRouterService] [forwardChatCompletionStream] Calling OpenRouter API (stream) - model: ${payload.model}`,
+      `[🔄] [forwardChatCompletionStream] model: ${payload.model}, max_tokens: ${payload.max_tokens}`,
     );
 
     try {
@@ -210,29 +262,49 @@ export class OpenRouterService {
           },
         ),
       );
-
-      console.log(
-        `[✅] [OpenRouterService] [forwardChatCompletionStream] Stream connected`,
-      );
+      console.log(`[✅] [forwardChatCompletionStream] Stream connected`);
       return response.data as Readable;
     } catch (error) {
       const axiosError = error as AxiosError;
+      const statusCode = axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorBody = await this.readStreamError(axiosError);
+
+      // Auto-retry: nếu 402 thì giảm max_tokens và thử lại
+      if (statusCode === 402) {
+        const affordable = this.parseAffordableTokens(errorBody);
+        if (affordable && affordable > 500) {
+          const retryTokens = Math.floor(affordable * 0.9);
+          console.log(`[🔄] [forwardChatCompletionStream] 402 → Auto-retry with max_tokens: ${retryTokens}`);
+          const retryPayload = this.buildPayload(requestDto, retryTokens);
+          retryPayload.stream = true;
+          try {
+            const retryResponse = await firstValueFrom(
+              this.httpService.post(
+                `${this.openRouterApiUrl}/chat/completions`,
+                retryPayload,
+                {
+                  headers: this.buildHeaders(),
+                  responseType: 'stream',
+                },
+              ),
+            );
+            console.log(`[✅] [forwardChatCompletionStream] Retry success with ${retryTokens} tokens`);
+            return retryResponse.data as Readable;
+          } catch (retryError) {
+            console.error(`[🔴] [forwardChatCompletionStream] Retry also failed`);
+          }
+        }
+      }
 
       console.error(
-        `[🔴] [OpenRouterService] [forwardChatCompletionStream] Error:`,
-        axiosError.response?.data || axiosError.message,
+        `[🔴] [forwardChatCompletionStream] Error - status: ${statusCode}, model: ${payload.model}`,
+        JSON.stringify(errorBody),
       );
 
-      const statusCode =
-        axiosError.response?.status || HttpStatus.INTERNAL_SERVER_ERROR;
-      const errorMessage =
-        axiosError.message ||
-        'An error occurred while communicating with OpenRouter';
-
       throw new HttpException(
-        {
+        errorBody || {
           error: {
-            message: `Failed to start stream: ${errorMessage}`,
+            message: `Failed to start stream: ${axiosError.message}`,
             type: 'api_error',
           },
         },
@@ -241,3 +313,4 @@ export class OpenRouterService {
     }
   }
 }
+

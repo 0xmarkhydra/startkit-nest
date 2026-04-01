@@ -112,79 +112,66 @@ Hoặc dùng alias: LYNXAI.01 (mặc định: moonshotai/kimi-k2.5)`,
   @Type(() => MessageDto)
   messages: MessageDto[];
 
-  @ApiPropertyOptional({
-    description:
-      'Giá trị Temperature để điều khiển độ sáng tạo (0.0 đến 2.0)',
-    example: 0.7,
-    type: Number,
-  })
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Temperature (0.0 đến 2.0)', example: 0.7 })
   @IsOptional()
   temperature?: number;
 
-  @ApiPropertyOptional({
-    description: 'Nếu là true, sẽ trả về một luồng (stream) các token',
-    example: false,
-    type: Boolean,
-  })
+  @ApiPropertyOptional({ description: 'Streaming mode', example: false })
   @IsOptional()
   stream?: boolean;
 
-  // === Các trường optional theo chuẩn OpenAI ===
-
-  @ApiPropertyOptional({
-    description: 'Số lượng token tối đa cho response',
-    example: 4096,
-  })
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Max tokens cho response' })
   @IsOptional()
   max_tokens?: number;
 
-  @ApiPropertyOptional({
-    description: 'Top-p sampling (0.0 đến 1.0)',
-    example: 1.0,
-  })
-  @IsNumber()
+  // Alias mới của OpenAI (thay max_tokens)
+  @ApiPropertyOptional({ description: 'Max completion tokens (OpenAI v2 alias)' })
+  @IsOptional()
+  max_completion_tokens?: number;
+
+  @ApiPropertyOptional({ description: 'Top-p sampling' })
   @IsOptional()
   top_p?: number;
 
-  @ApiPropertyOptional({
-    description: 'Frequency penalty (-2.0 đến 2.0)',
-    example: 0,
-  })
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Frequency penalty' })
   @IsOptional()
   frequency_penalty?: number;
 
-  @ApiPropertyOptional({
-    description: 'Presence penalty (-2.0 đến 2.0)',
-    example: 0,
-  })
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Presence penalty' })
   @IsOptional()
   presence_penalty?: number;
 
-  @ApiPropertyOptional({
-    description: 'Chuỗi hoặc mảng chuỗi để dừng generation',
-  })
+  @ApiPropertyOptional({ description: 'Stop sequences' })
   @IsOptional()
   stop?: string | string[];
 
-  @ApiPropertyOptional({
-    description: 'Danh sách tools (functions) cho function calling',
-  })
+  @ApiPropertyOptional({ description: 'Tools (function calling)' })
   @IsOptional()
   tools?: any[];
 
-  @ApiPropertyOptional({
-    description: 'Cách chọn tool: auto, none, hoặc chỉ định cụ thể',
-  })
+  @ApiPropertyOptional({ description: 'Tool choice' })
   @IsOptional()
   tool_choice?: any;
 
-  @ApiPropertyOptional({
-    description: 'Stream options (e.g. include_usage)',
-  })
+  @ApiPropertyOptional({ description: 'Stream options' })
   @IsOptional()
   stream_options?: any;
+
+  // Anthropic extended thinking
+  @ApiPropertyOptional({ description: 'Anthropic thinking config' })
+  @IsOptional()
+  thinking?: any;
+
+  @ApiPropertyOptional({ description: 'Budget tokens for thinking' })
+  @IsOptional()
+  budget_tokens?: number;
+
+  // OpenRouter/Anthropic reasoning effort
+  @ApiPropertyOptional({ description: 'Reasoning effort level' })
+  @IsOptional()
+  reasoning_effort?: string;
+
+  // Cho phép bất kỳ extra field nào từ client đi qua
+  [key: string]: any;
 }
+

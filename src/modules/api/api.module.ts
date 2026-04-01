@@ -43,7 +43,7 @@ const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
         try {
           // Use REDIS_URL if available (higher priority), otherwise build URL from individual env vars
           let urlRedis: string;
-          
+
           if (process.env.REDIS_URL) {
             // Use REDIS_URL directly, add family if needed
             urlRedis = process.env.REDIS_URL;
@@ -62,7 +62,7 @@ const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
             }
             console.log(`[✅] [ApiModule] [useFactory] [redisUrl]: Using individual env variables`);
           }
-          
+
           const store = await redisStore({
             url: urlRedis,
             ttl: Number(configService.get('cache.api.cache_ttl')) / 1000,
@@ -72,7 +72,7 @@ const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
           try {
             if (store && (store as any).client) {
               const client = (store as any).client;
-              
+
               client.on('error', (err: Error) => {
                 if (err.message && err.message.includes('ECONNREFUSED')) {
                   console.log(`[🔴] [ApiModule] [useFactory] [redisError]: Redis server refused the connection - ${err.message}`);
@@ -82,16 +82,16 @@ const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
                   console.log(`[⚠️] [ApiModule] [useFactory] [redisError]: ${err.message || 'Unknown error'}`);
                 }
               });
-              
+
               client.on('connect', () => {
                 console.log(`[✅] [ApiModule] [useFactory] [redisConnect]: Redis cache connected`);
               });
-              
+
               if (typeof client.on === 'function') {
                 client.on('ready', () => {
                   console.log(`[✅] [ApiModule] [useFactory] [redisReady]: Redis cache is ready`);
                 });
-                
+
                 client.on('reconnecting', () => {
                   console.log(`[🔄] [ApiModule] [useFactory] [redisReconnecting]: Redis is reconnecting...`);
                 });
@@ -121,12 +121,9 @@ const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
       expandVariables: true,
       load: [configAuth, configCache],
     }),
-    JwtModule.registerAsync({
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('auth.jwt.jwt_secret_key'),
-        global: true,
-      }),
-      inject: [ConfigService],
+    JwtModule.register({
+      secret: process.env.JWT_SECRET_KEY || 'jwt-secret-default',
+      global: true,
     }),
     ThrottlerModule.forRoot({
       ttl: 60,
@@ -146,12 +143,11 @@ const repositories = [ApiKeyRepository, UserRepository, RequestLogRepository];
     ...services,
     ...repositories,
     JwtStrategy,
-    JwtService,
   ],
   exports: [...services],
 })
 export class ApiModule implements OnApplicationBootstrap {
-  constructor() {}
+  constructor() { }
 
-  async onApplicationBootstrap() {}
+  async onApplicationBootstrap() { }
 }
