@@ -8,30 +8,27 @@ import { Readable } from 'stream';
 
 @Injectable()
 export class OpenRouterService {
+  private readonly activeProvider: string;
   private readonly openRouterApiUrl: string;
   private readonly openRouterApiKey: string;
+  private readonly moonshotApiUrl: string;
+  private readonly moonshotApiKey: string;
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.openRouterApiUrl =
-      process.env.OPENROUTER_API_URL ||
-      this.configService.get<string>('OPENROUTER_API_URL') ||
-      'https://openrouter.ai/api/v1';
-    this.openRouterApiKey =
-      process.env.OPENROUTER_API_KEY ||
-      this.configService.get<string>('OPENROUTER_API_KEY');
+    this.activeProvider = process.env.ACTIVE_AI_PROVIDER || 'openrouter';
 
-    if (!this.openRouterApiKey) {
-      console.error(
-        '🔴 [OpenRouterService] [constructor] OPENROUTER_API_KEY is not configured',
-      );
-    } else {
-      console.log(
-        `[✅] [OpenRouterService] [constructor] API Key loaded (length: ${this.openRouterApiKey.length})`,
-      );
-    }
+    // OpenRouter Configs
+    this.openRouterApiUrl = process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1';
+    this.openRouterApiKey = process.env.OPENROUTER_API_KEY || '';
+
+    // Moonshot Configs
+    this.moonshotApiUrl = process.env.MOONSHOT_API_URL || 'https://api.moonshot.ai/v1';
+    this.moonshotApiKey = process.env.MOONSHOT_API_KEY || '';
+
+    console.log(`[🤖] [OpenRouterService] Proxy Active Provider: ${this.activeProvider}`);
   }
 
   // Danh sách các model được hỗ trợ (có thể mở rộng)
@@ -83,13 +80,40 @@ export class OpenRouterService {
     'z-ai/glm-5',
   ];
 
-  // Helper mapping cho model — force tất cả về moonshotai/kimi-k2.5
-  private mapModelName(model: string): string {
-    const FORCED_MODEL = 'moonshotai/kimi-k2.5';
-    if (model !== FORCED_MODEL) {
-      console.log(`[🔄] [mapModelName] ${model} → ${FORCED_MODEL} (forced)`);
+  // Helper lấy cấu hình tương ứng với provider đang kích hoạt
+  private getProviderConfig() {
+    if (this.activeProvider === 'moonshot') {
+      return {
+        apiUrl: this.moonshotApiUrl,
+        apiKey: this.moonshotApiKey,
+        headers: {
+          Authorization: `Bearer ${this.moonshotApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        forcedModel: 'kimi-k2.5', // Đáp ứng ngay yêu cầu dùng Kimi 2.5 xịn nhất của sếp!
+      };
     }
-    return FORCED_MODEL;
+
+    // Default: OpenRouter
+    return {
+      apiUrl: this.openRouterApiUrl,
+      apiKey: this.openRouterApiKey,
+      headers: {
+        Authorization: `Bearer ${this.openRouterApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://lynxai.com',
+        'X-Title': 'LynxAI Forwarder',
+      },
+      forcedModel: 'moonshotai/kimi-k2.5',
+    };
+  }
+
+  // Helper mapping cho model — ép về model của provider hiện tại
+  private mapModelName(model: string, forcedModel: string): string {
+    if (model !== forcedModel) {
+      console.log(`[🔄] [mapModelName] ${model} → ${forcedModel} (forced by ${this.activeProvider})`);
+    }
+    return forcedModel;
   }
 
   /**
@@ -97,7 +121,8 @@ export class OpenRouterService {
    * Giữ nguyên tất cả fields mà client gửi lên, chỉ map model name.
    */
   private buildPayload(requestDto: ChatCompletionRequestDto, maxTokensOverride?: number): Record<string, any> {
-    const targetModel = this.mapModelName(requestDto.model);
+    const config = this.getProviderConfig();
+    const targetModel = this.mapModelName(requestDto.model, config.forcedModel);
 
     // Spread tất cả fields từ DTO, override model đã map
     const payload: Record<string, any> = {
@@ -118,6 +143,25 @@ export class OpenRouterService {
     payload.max_tokens = cappedTokens;
     delete payload.max_completion_tokens;
 
+    // Tiêm (Inject) System Prompt ép buộc trả lời bằng tiếng Việt
+    if (Array.isArray(payload.messages)) {
+      const viInstruction = "Luôn ưu tiên trả lời và giải thích bằng tiếng Việt.";
+      
+      const firstMsg = payload.messages[0];
+      if (firstMsg && firstMsg.role === 'system') {
+        // Nếu đã có cấu hình system sẵn, đính kèm thêm
+        if (typeof firstMsg.content === 'string' && !firstMsg.content.includes("tiếng Việt")) {
+          firstMsg.content = `${viInstruction}\n\n${firstMsg.content}`;
+        }
+      } else {
+        // Nếu chưa có, chèn một tin nhắn system mới vào đầu mảng
+        payload.messages.unshift({
+          role: 'system',
+          content: viInstruction,
+        });
+      }
+    }
+
     // Loại bỏ undefined fields
     Object.keys(payload).forEach((key) => {
       if (payload[key] === undefined) {
@@ -129,15 +173,10 @@ export class OpenRouterService {
   }
 
   /**
-   * Build common headers cho request đến OpenRouter
+   * Build common headers cho request đến Provider
    */
   private buildHeaders(): Record<string, string> {
-    return {
-      Authorization: `Bearer ${this.openRouterApiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://lynxai.com',
-      'X-Title': 'LynxAI Forwarder',
-    };
+    return this.getProviderConfig().headers;
   }
 
   /**
@@ -188,10 +227,12 @@ export class OpenRouterService {
       `[🔄] [forwardChatCompletion] model: ${payload.model}, max_tokens: ${payload.max_tokens}`,
     );
 
+    const config = this.getProviderConfig();
+
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          `${this.openRouterApiUrl}/chat/completions`,
+          `${config.apiUrl}/chat/completions`,
           payload,
           { headers: this.buildHeaders() },
         ),
@@ -217,7 +258,7 @@ export class OpenRouterService {
           try {
             const retryResponse = await firstValueFrom(
               this.httpService.post(
-                `${this.openRouterApiUrl}/chat/completions`,
+                `${config.apiUrl}/chat/completions`,
                 retryPayload,
                 { headers: this.buildHeaders() },
               ),
@@ -251,10 +292,12 @@ export class OpenRouterService {
       `[🔄] [forwardChatCompletionStream] model: ${payload.model}, max_tokens: ${payload.max_tokens}`,
     );
 
+    const config = this.getProviderConfig();
+
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          `${this.openRouterApiUrl}/chat/completions`,
+          `${config.apiUrl}/chat/completions`,
           payload,
           {
             headers: this.buildHeaders(),
@@ -280,7 +323,7 @@ export class OpenRouterService {
           try {
             const retryResponse = await firstValueFrom(
               this.httpService.post(
-                `${this.openRouterApiUrl}/chat/completions`,
+                `${config.apiUrl}/chat/completions`,
                 retryPayload,
                 {
                   headers: this.buildHeaders(),

@@ -75,7 +75,7 @@ export class OpenRouterController {
         stream.on('data', (chunk: Buffer) => {
           let text = chunk.toString();
           // Thay tên model thật bằng tên model gốc từ Cursor
-          text = text.replace(/moonshotai\/kimi-k2\.5[^"']*/g, originalModel);
+          text = text.replace(/"model"\s*:\s*"[^"]+"/g, `"model":"${originalModel}"`);
           res.write(text);
         });
 
