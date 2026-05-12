@@ -33,8 +33,7 @@ async function bootstrap() {
     if (process.env.APP_ENV !== 'production') {
       const options = new DocumentBuilder()
         .setTitle('API docs')
-        // .setVersion(DEFAULT_API_VERSION)
-        .addBearerAuth()
+        .addCookieAuth('access_token')
         .build();
       const document = SwaggerModule.createDocument(app, options);
       SwaggerModule.setup('docs', app, document);

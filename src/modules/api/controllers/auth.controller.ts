@@ -6,7 +6,7 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiCookieAuth } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from '../services/auth.service';
@@ -57,6 +57,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('access_token')
   @ApiOperation({ summary: 'Clear auth cookie' })
   async logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie(COOKIE_NAME, { ...COOKIE_OPTIONS });
