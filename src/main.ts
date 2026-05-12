@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import cookieParser = require('cookie-parser');
 
 const isApi = Boolean(Number(process.env.IS_API || 0));
 
@@ -15,14 +16,14 @@ async function bootstrap() {
   });
 
   if (isApi) {
-    // const corsOrigin = process.env.CORS_ORIGIN.split(',') || [
-    //   'http://localhost:3000',
-    // ];
+    const corsOrigins = process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',')
+      : ['http://localhost:3000'];
 
+    app.use(cookieParser());
     app.enableCors({
-      // allowedHeaders: ['content-type'],
-      origin: '*',
-      // credentials: true,
+      origin: corsOrigins,
+      credentials: true,
     });
 
     app.useLogger(app.get(PinoLogger));
