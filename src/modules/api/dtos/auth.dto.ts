@@ -1,48 +1,47 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEthereumAddress, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
 
-export class GetNonceQueryDto {
-  @ApiProperty({
-    description: 'Ethereum address of wallet (used for Binance Wallet)',
-    example: '0x1234567890123456789012345678901234567890',
-  })
-  @IsEthereumAddress()
+export class RegisterDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
   @IsNotEmpty()
-  address: string;
+  email: string;
+
+  @ApiProperty({ example: 'StrongPass123', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @ApiProperty({ example: 'john_doe', required: false })
+  @IsString()
+  @IsOptional()
+  username?: string;
 }
 
-export class VerifySignatureDto {
-  @ApiProperty({
-    description: 'Ethereum address of wallet (used for Binance Wallet)',
-    example: '0x1234567890123456789012345678901234567890',
-  })
-  @IsEthereumAddress()
+export class LoginDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
   @IsNotEmpty()
-  address: string;
+  email: string;
 
-  @ApiProperty({
-    description: 'Signed message',
-    example: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-  })
+  @ApiProperty({ example: 'StrongPass123' })
   @IsString()
   @IsNotEmpty()
-  signature: string;
+  password: string;
+}
+
+export class AuthUserDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty({ required: false })
+  username?: string;
 }
 
 export class AuthResponseDto {
-  @ApiProperty({
-    description: 'JWT token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ',
-  })
-  access_token: string;
-  
-  @ApiProperty({
-    description: 'User information',
-  })
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    address: string;
-  };
+  @ApiProperty()
+  user: AuthUserDto;
 }
