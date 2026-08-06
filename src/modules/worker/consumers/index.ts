@@ -1,1 +1,1 @@
-export * from './user.consumer';
+export * from './sample.consumer';

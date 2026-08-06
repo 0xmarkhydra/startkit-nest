@@ -1,9 +1,9 @@
 export const QUEUE_NAME = {
-  USER: 'user',
-};
+  SAMPLE: 'sample',
+} as const;
 
 export const QUEUE_PROCESSOR = {
-  USER: {
-    FETCH_DATA_WHEN_SIGN_UP: 'FETCH_DATA_WHEN_SIGN_UP',
+  SAMPLE: {
+    HANDLE: 'HANDLE_SAMPLE_JOB',
   },
-};
+} as const;

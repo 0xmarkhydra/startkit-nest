@@ -13,7 +13,6 @@ describe('HealthController (e2e)', () => {
 
   beforeAll(async () => {
     process.env.APP_ENV = 'test';
-    process.env.JWT_SECRET_KEY = 'test-secret';
     process.env.DATABASE_URL =
       process.env.DATABASE_URL ||
       'postgresql://startkit:startkit@localhost:5432/startkit';
@@ -35,7 +34,7 @@ describe('HealthController (e2e)', () => {
       return;
     }
 
-    const queue = app.get<Queue>(getQueueToken(QUEUE_NAME.USER), {
+    const queue = app.get<Queue>(getQueueToken(QUEUE_NAME.SAMPLE), {
       strict: false,
     });
     await queue.close().catch(() => undefined);

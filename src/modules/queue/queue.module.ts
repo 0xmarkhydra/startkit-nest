@@ -22,7 +22,7 @@ import { QueueService } from './queue.service';
       }),
     }),
     BullModule.registerQueue({
-      name: QUEUE_NAME.USER,
+      name: QUEUE_NAME.SAMPLE,
     }),
   ],
   providers: [QueueService],

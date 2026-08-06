@@ -1,7 +1,6 @@
 import { Global, Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import { configAuth } from '@/api/configs/auth';
 import { configCache } from '@/api/configs/cache';
 import { configDb } from '@/database/configs';
 import { configQueue } from '@/queue/configs';
@@ -15,7 +14,7 @@ import { validateEnvironment } from './env.validation';
       cache: true,
       expandVariables: true,
       validate: validateEnvironment,
-      load: [configAuth, configCache, configDb, configQueue],
+      load: [configCache, configDb, configQueue],
     }),
     LoggerModule.forRootAsync({
       imports: [ConfigModule],

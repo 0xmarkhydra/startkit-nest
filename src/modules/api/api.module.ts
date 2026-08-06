@@ -2,17 +2,12 @@ import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { redisStore } from 'cache-manager-redis-store';
 import { DatabaseModule } from '@/database';
-import { BusinessModule } from '@/business/business.module';
 import { QueueModule } from '@/queue/queue.module';
 import { HealthController } from './controllers';
-import {
-  FormatResponseInterceptor,
-  HttpCacheInterceptor,
-} from './interceptors';
+import { FormatResponseInterceptor } from './interceptors';
 
 @Module({
   imports: [
@@ -22,7 +17,6 @@ import {
     }),
     DatabaseModule,
     QueueModule,
-    BusinessModule,
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
@@ -56,22 +50,9 @@ import {
         }
       },
     }),
-    JwtModule.registerAsync({
-      global: true,
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.getOrThrow<string>('auth.jwt.jwt_secret_key'),
-        signOptions: {
-          expiresIn: configService.get<number>(
-            'auth.jwt.access_token_lifetime',
-          ),
-        },
-      }),
-    }),
   ],
   controllers: [HealthController],
   providers: [
-    HttpCacheInterceptor,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -81,6 +62,5 @@ import {
       useClass: FormatResponseInterceptor,
     },
   ],
-  exports: [HttpCacheInterceptor],
 })
 export class ApiModule {}
