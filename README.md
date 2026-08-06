@@ -8,6 +8,7 @@ A production-minded NestJS starter kit for applications that need an HTTP API, b
 - Centralized and validated environment configuration
 - PostgreSQL through TypeORM
 - Redis-backed cache and Bull queues
+- A neutral sample queue producer and worker consumer
 - Structured Pino logging with sensitive-header redaction
 - Global request validation and standardized API responses
 - Global rate limiting
@@ -16,7 +17,7 @@ A production-minded NestJS starter kit for applications that need an HTTP API, b
 - Docker and Docker Compose setup
 - Unit, end-to-end, build, and Docker checks in GitHub Actions
 
-> Authentication infrastructure is prepared through `JwtModule`, but a complete user registration, login, refresh-token, and authorization flow is intentionally not claimed as finished yet.
+The core intentionally does not ship product-specific authentication, AI integrations, WebSocket events, entities, repositories, or scheduled jobs. Add those as explicit application modules when they are needed.
 
 ## Architecture
 
@@ -28,16 +29,14 @@ src/
 ├── worker-app.module.ts    # Worker application root
 ├── core/                   # Global configuration and logging
 ├── modules/
-│   ├── api/                # Controllers, filters, guards, interceptors
-│   ├── business/           # Business services
-│   ├── database/           # TypeORM entities and repositories
-│   ├── queue/              # Bull queues and producers
-│   ├── websocket/          # Optional Socket.IO gateway
-│   └── worker/             # Queue consumers and scheduled jobs
-└── shared/                 # Shared contracts, decorators and utilities
+│   ├── api/                # Controllers, filters and interceptors
+│   ├── database/           # TypeORM connection infrastructure
+│   ├── queue/              # Bull configuration and producers
+│   └── worker/             # Queue consumers
+└── shared/                 # Shared contracts, decorators and constants
 ```
 
-The API and worker are independent processes. They share the same core modules and infrastructure, but the worker does not initialize HTTP controllers, Swagger, CORS, HTTP cache, or rate limiting.
+The API and worker are independent processes. They share configuration and infrastructure, while the worker does not initialize HTTP controllers, Swagger, CORS, HTTP cache, or rate limiting.
 
 ## Requirements
 
@@ -89,6 +88,12 @@ API and worker can also be launched together with Docker Compose:
 docker compose up --build
 ```
 
+## Sample queue
+
+`QueueService.addSampleJob()` demonstrates how the API side can enqueue work. `SampleConsumer` demonstrates how the worker processes the job with structured logging.
+
+Replace the sample queue name, payload, producer, and consumer with a real application feature rather than adding product-specific behavior to the shared core.
+
 ## Scripts
 
 | Command | Purpose |
@@ -103,6 +108,7 @@ docker compose up --build
 | `pnpm run test:cov` | Generate test coverage |
 | `pnpm run lint` | Check lint rules |
 | `pnpm run lint:fix` | Format and fix lint issues |
+| `pnpm run check` | Run lint, build, and unit tests |
 
 ## Environment
 
@@ -112,7 +118,6 @@ The application fails fast when required infrastructure variables are missing.
 APP_ENV=development
 PORT=8000
 CORS_ORIGIN=http://localhost:3000
-JWT_SECRET_KEY=change-me-with-a-long-random-secret
 DATABASE_URL=postgresql://startkit:startkit@localhost:5432/startkit
 REDIS_URL=redis://localhost:6379/0
 DB_SYNC=0
@@ -121,8 +126,6 @@ DB_DEBUG=0
 
 For production:
 
-- Use a long random `JWT_SECRET_KEY`.
-- Do not use a value containing `change-me`.
 - Keep `DB_SYNC=0` and manage schema changes through migrations.
 - Restrict `CORS_ORIGIN` to trusted frontends.
 - Run API and worker as separate deployments.
@@ -143,6 +146,10 @@ Successful controller responses are wrapped globally:
 
 Unexpected production errors return a safe generic response with an error ID. Internal causes are only exposed outside production.
 
+## Database schema
+
+The starter does not create placeholder tables. Add entities and TypeORM migrations as part of the first real feature. The readiness endpoint checks PostgreSQL with `SELECT 1` and does not depend on an application table.
+
 ## Deployment
 
 Build one image and run it with different commands:
@@ -156,14 +163,11 @@ The included Docker image defaults to the API command. Override the command with
 
 ## Current roadmap
 
-The next production layers are:
-
-1. Complete authentication and user modules
-2. Refresh-token rotation and role/permission guards
-3. TypeORM migration commands and an initial migration
-4. A complete example feature from controller to queue consumer
-5. WebSocket authentication and explicit module opt-in
-6. Stronger integration-test coverage
+1. TypeORM migration commands and an initial real feature migration
+2. A complete example HTTP endpoint that enqueues the sample job
+3. Authentication as an optional application module
+4. Stronger integration-test coverage
+5. Optional WebSocket and scheduler modules with dedicated tests
 
 ## License
 
