@@ -38,7 +38,6 @@ jobs:
       APP_ENV: test
       PORT: 8000
       CORS_ORIGIN: http://localhost:3000
-      JWT_SECRET_KEY: test-secret-for-ci
       DATABASE_URL: postgresql://startkit:startkit@localhost:5432/startkit
       REDIS_URL: redis://localhost:6379/0
       DB_SYNC: 1
