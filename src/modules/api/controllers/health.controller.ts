@@ -1,63 +1,42 @@
+import { Controller, Get, HttpStatus } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminConfigRepository } from '@/database/repositories';
 import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
-import { ApiBaseResponse } from '@/shared/swagger/decorator/api-response.decorator';
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  HttpStatus,
-  UseInterceptors,
-} from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { FormatResponseInterceptor } from '../interceptors';
 
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
-  constructor(private adminConfigRepository: AdminConfigRepository) {}
+  constructor(
+    private readonly adminConfigRepository: AdminConfigRepository,
+  ) {}
 
-  funErr() {
-    console.log('Test error ');
-    try {
-      throw new Error('Test error');
-    } catch (e) {
-      throw e;
-    }
-  }
-
-  @Get('')
-  @ResponseMessage('Hello')
-  @ApiOperation({ summary: 'Basic health check endpoint' })
+  @Get()
+  @ResponseMessage('API is healthy')
+  @ApiOperation({ summary: 'Basic liveness check' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'API is healthy',
+    description: 'The API process is healthy',
   })
-  async healthCheck() {
-    return 1;
+  healthCheck() {
+    return {
+      status: 'ok',
+      service: 'api',
+      timestamp: new Date().toISOString(),
+    };
   }
 
-  @Get('check-db')
-  @ApiOperation({ summary: 'Check database connection' })
+  @Get('ready')
+  @ResponseMessage('API dependencies are ready')
+  @ApiOperation({ summary: 'Database readiness check' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Database connection is healthy',
+    description: 'The database connection is ready',
   })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Database connection failed',
-  })
-  async checkDB() {
-    const result = await this.adminConfigRepository.findOne({ where: {} });
-    return result || { status: 'Database connected, but no admin config found' };
-  }
-
-  @Get('throw')
-  @ApiOperation({ summary: 'Testing error handling' })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'This endpoint always throws an error',
-  })
-  throwError() {
-    this.funErr();
+  async readinessCheck() {
+    await this.adminConfigRepository.findOne({ where: {} });
+    return {
+      status: 'ready',
+      database: 'connected',
+    };
   }
 }

@@ -1,19 +1,26 @@
-FROM node:18.15.0 AS builder
+FROM node:20-alpine AS build
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install -g pnpm
-RUN pnpm install
+RUN npm install --global pnpm@9
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
 COPY . .
 RUN pnpm run build
+RUN pnpm prune --prod
 
-FROM node:18.15.0 AS runner
-RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
-WORKDIR /home/node/app
-COPY --chown=node:node package*.json ./
-RUN npm install -g pnpm
-RUN pnpm install @nestjs/core
+FROM node:20-alpine AS runtime
+
+ENV NODE_ENV=production
+ENV APP_ENV=production
+WORKDIR /app
+
+COPY --from=build --chown=node:node /app/package.json ./package.json
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+
 USER node
-EXPOSE 8080
-COPY --from=builder --chown=node:node /app/dist  .
-# RUN pnpm run migration:run
-CMD ["pnpm", "run", "start:prod"]
+EXPOSE 8000
+
+CMD ["node", "dist/main.js"]

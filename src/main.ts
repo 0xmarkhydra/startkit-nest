@@ -1,47 +1,59 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
-import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 
-const isApi = Boolean(Number(process.env.IS_API || 0));
-
-const PORT = process.env.PORT || '3000';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    // logger: false,
-    // bufferLogs: true,
+    bufferLogs: true,
   });
 
-  if (isApi) {
-    // const corsOrigin = process.env.CORS_ORIGIN.split(',') || [
-    //   'http://localhost:3000',
-    // ];
+  const configService = app.get(ConfigService);
+  const appEnv = configService.get<string>('APP_ENV') || 'development';
+  const isProduction = appEnv === 'production';
+  const port = configService.get<number>('PORT') || 8000;
+  const corsOrigins = (configService.get<string>('CORS_ORIGIN') || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
-    app.enableCors({
-      // allowedHeaders: ['content-type'],
-      origin: '*',
-      // credentials: true,
-    });
+  app.useLogger(app.get(PinoLogger));
+  app.enableShutdownHooks();
+  app.enableCors({
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
+    credentials: true,
+  });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: isProduction,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+  app.useGlobalFilters(
+    new GlobalExceptionFilter(!isProduction, true),
+  );
 
-    app.useLogger(app.get(PinoLogger));
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
-    app.useGlobalFilters(new GlobalExceptionFilter(true, true));
-
-    if (process.env.APP_ENV !== 'production') {
-      const options = new DocumentBuilder()
-        .setTitle('API docs')
-        // .setVersion(DEFAULT_API_VERSION)
-        .addBearerAuth()
-        .build();
-      const document = SwaggerModule.createDocument(app, options);
-      SwaggerModule.setup('docs', app, document);
-    }
-    await app.listen(PORT);
-    Logger.log(`🚀 Application is running in port http://localhost:${PORT}`);
-  } else {
-    await app.init();
+  if (!isProduction) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Startkit Nest API')
+      .setDescription('Development API documentation')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document);
   }
+
+  await app.listen(port, '0.0.0.0');
+  Logger.log(`API is running at http://localhost:${port}`);
 }
-bootstrap();
+
+bootstrap().catch((error) => {
+  Logger.error('Failed to start API', error?.stack || error);
+  process.exit(1);
+});

@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/**
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: startkit
+          POSTGRES_PASSWORD: startkit
+          POSTGRES_DB: startkit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U startkit -d startkit"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: test
+      PORT: 8000
+      CORS_ORIGIN: http://localhost:3000
+      JWT_SECRET_KEY: test-secret-for-ci
+      DATABASE_URL: postgresql://startkit:startkit@localhost:5432/startkit
+      REDIS_URL: redis://localhost:6379/0
+      DB_SYNC: 1
+      DB_DEBUG: 0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Unit tests
+        run: pnpm exec jest --runInBand
+
+      - name: End-to-end tests
+        run: pnpm run test:e2e
+
+      - name: Build Docker image
+        run: docker build --tag startkit-nest:ci .
