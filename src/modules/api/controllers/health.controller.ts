@@ -1,14 +1,13 @@
 import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AdminConfigRepository } from '@/database/repositories';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
 
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
-  constructor(
-    private readonly adminConfigRepository: AdminConfigRepository,
-  ) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   @Get()
   @ResponseMessage('API is healthy')
@@ -33,7 +32,8 @@ export class HealthController {
     description: 'The database connection is ready',
   })
   async readinessCheck() {
-    await this.adminConfigRepository.findOne({ where: {} });
+    await this.dataSource.query('SELECT 1');
+
     return {
       status: 'ready',
       database: 'connected',
