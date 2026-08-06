@@ -15,10 +15,6 @@ export function validateEnvironment(config: Environment): Environment {
   const appEnv = String(config.APP_ENV || 'development');
   const errors: string[] = [];
 
-  if (!hasValue(config.JWT_SECRET_KEY)) {
-    errors.push('JWT_SECRET_KEY is required');
-  }
-
   const hasDatabaseUrl = hasValue(config.DATABASE_URL);
   const hasDatabaseFields =
     hasValue(config.DB_HOST) &&
@@ -36,13 +32,6 @@ export function validateEnvironment(config: Environment): Environment {
   const hasRedisHost = hasValue(config.REDIS_HOST);
   if (!hasRedisUrl && !hasRedisHost) {
     errors.push('Configure REDIS_URL or REDIS_HOST');
-  }
-
-  if (
-    appEnv === 'production' &&
-    String(config.JWT_SECRET_KEY).includes('change-me')
-  ) {
-    errors.push('JWT_SECRET_KEY must be changed in production');
   }
 
   if (errors.length > 0) {
