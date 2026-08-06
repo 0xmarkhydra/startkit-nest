@@ -1,27 +1,23 @@
 import { QUEUE_NAME, QUEUE_PROCESSOR } from '@/shared/constants/queue';
 import { InjectQueue } from '@nestjs/bull';
+import { Injectable } from '@nestjs/common';
 import { Queue } from 'bull';
 
+export type SampleJobPayload = {
+  message: string;
+};
+
+@Injectable()
 export class QueueService {
   constructor(
-    @InjectQueue(QUEUE_NAME.USER)
-    private userQueue: Queue,
+    @InjectQueue(QUEUE_NAME.SAMPLE)
+    private readonly sampleQueue: Queue<SampleJobPayload>,
   ) {}
 
-  async fetchDataWhenSignUp(username: string) {
-    console.log(
-      '🚀 ~ QueueService ~ fetchDataWhenSignUp ~ username:',
-      username,
-    );
-    await this.userQueue.add(
-      QUEUE_PROCESSOR.USER.FETCH_DATA_WHEN_SIGN_UP,
-      {
-        username,
-      },
-      {
-        removeOnComplete: 20,
-        removeOnFail: true,
-      },
-    );
+  async addSampleJob(payload: SampleJobPayload) {
+    return this.sampleQueue.add(QUEUE_PROCESSOR.SAMPLE.HANDLE, payload, {
+      removeOnComplete: 20,
+      removeOnFail: 50,
+    });
   }
 }
