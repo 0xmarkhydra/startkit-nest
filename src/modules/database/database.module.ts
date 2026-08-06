@@ -1,11 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AdminConfigRepository } from './repositories';
-import { AdminConfigEntity } from './entities/admin-config.entity';
-
-const repositories = [AdminConfigRepository];
-const entities = [AdminConfigEntity];
 
 @Module({
   imports: [
@@ -14,9 +9,7 @@ const entities = [AdminConfigEntity];
       useFactory: (configService: ConfigService) =>
         configService.getOrThrow('db'),
     }),
-    TypeOrmModule.forFeature(entities),
   ],
-  providers: [...repositories],
-  exports: [...repositories, TypeOrmModule],
+  exports: [TypeOrmModule],
 })
 export class DatabaseModule {}
