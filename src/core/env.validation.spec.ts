@@ -4,7 +4,6 @@ describe('validateEnvironment', () => {
   const validEnvironment = {
     APP_ENV: 'test',
     PORT: '8000',
-    JWT_SECRET_KEY: 'test-secret',
     DATABASE_URL: 'postgresql://user:pass@localhost:5432/database',
     REDIS_URL: 'redis://localhost:6379/0',
   };
@@ -16,22 +15,21 @@ describe('validateEnvironment', () => {
     });
   });
 
-  it('rejects a missing JWT secret', () => {
+  it('rejects a missing database configuration', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
-        JWT_SECRET_KEY: '',
+        DATABASE_URL: '',
       }),
-    ).toThrow('JWT_SECRET_KEY is required');
+    ).toThrow('Configure DATABASE_URL');
   });
 
-  it('rejects placeholder secrets in production', () => {
+  it('rejects an invalid port', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
-        APP_ENV: 'production',
-        JWT_SECRET_KEY: 'change-me-in-production',
+        PORT: '70000',
       }),
-    ).toThrow('JWT_SECRET_KEY must be changed in production');
+    ).toThrow('Invalid port value');
   });
 });
