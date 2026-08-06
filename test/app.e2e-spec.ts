@@ -1,5 +1,11 @@
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { getQueueToken } from '@nestjs/bull';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Queue } from 'bull';
+import { QUEUE_NAME } from '@/shared/constants/queue';
+
+jest.setTimeout(30000);
 
 describe('HealthController (e2e)', () => {
   let app: INestApplication;
@@ -25,7 +31,26 @@ describe('HealthController (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app?.close();
+    if (!app) {
+      return;
+    }
+
+    const queue = app.get<Queue>(getQueueToken(QUEUE_NAME.USER), {
+      strict: false,
+    });
+    await queue.close().catch(() => undefined);
+
+    const cacheManager = app.get<any>(CACHE_MANAGER, { strict: false });
+    const cacheStore = cacheManager?.store;
+    const cacheClient = cacheStore?.client || cacheStore?.getClient?.();
+
+    if (typeof cacheClient?.quit === 'function') {
+      await Promise.resolve(cacheClient.quit()).catch(() => undefined);
+    } else if (typeof cacheClient?.disconnect === 'function') {
+      cacheClient.disconnect();
+    }
+
+    await app.close();
   });
 
   it('GET /health returns the standardized response', async () => {
