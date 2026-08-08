@@ -46,10 +46,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       const errorId = randomUUID();
-      this.logger.error(
-        `${request.method || 'HTTP'} ${request.url || 'unknown'} failed [${errorId}]`,
-        exception instanceof Error ? exception.stack : String(exception),
-      );
+      if (!this.shouldSuppressErrorLog(exception)) {
+        this.logger.error(
+          `${request.method || 'HTTP'} ${request.url || 'unknown'} failed [${errorId}]`,
+          exception instanceof Error ? exception.stack : String(exception),
+        );
+      }
 
       response.status(status).send({
         statusCode: status,
@@ -69,6 +71,25 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     response.status(status).send(normalized);
+  }
+
+  private shouldSuppressErrorLog(exception: unknown): boolean {
+    if (!(exception instanceof HttpException)) {
+      return false;
+    }
+
+    const exceptionResponse = exception.getResponse();
+    if (
+      typeof exceptionResponse !== 'object' ||
+      exceptionResponse === null ||
+      Array.isArray(exceptionResponse)
+    ) {
+      return false;
+    }
+
+    return (
+      (exceptionResponse as Record<string, unknown>).suppressErrorLog === true
+    );
   }
 
   private normalizeException(
