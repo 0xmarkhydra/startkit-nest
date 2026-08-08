@@ -1,15 +1,53 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 
+const parseTrustProxy = (): boolean | string => {
+  const value = process.env.TRUST_PROXY?.trim();
+  if (!value || value === '0' || value.toLowerCase() === 'false') {
+    return false;
+  }
+  if (value === '1' || value.toLowerCase() === 'true') {
+    return true;
+  }
+  return value;
+};
+
+const parsePositiveNumber = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
+  const adapter = new FastifyAdapter({
+    trustProxy: parseTrustProxy(),
+    bodyLimit: parsePositiveNumber(process.env.HTTP_BODY_LIMIT_BYTES, 1048576),
+    requestTimeout: parsePositiveNumber(
+      process.env.HTTP_REQUEST_TIMEOUT_MS,
+      30000,
+    ),
+    connectionTimeout: parsePositiveNumber(
+      process.env.HTTP_CONNECTION_TIMEOUT_MS,
+      10000,
+    ),
+    keepAliveTimeout: parsePositiveNumber(
+      process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS,
+      65000,
+    ),
   });
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    adapter,
+    { bufferLogs: true },
+  );
 
   const configService = app.get(ConfigService);
   const appEnv = configService.get<string>('APP_ENV') || 'development';
@@ -34,9 +72,7 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.useGlobalFilters(
-    new GlobalExceptionFilter(!isProduction, true),
-  );
+  app.useGlobalFilters(new GlobalExceptionFilter(!isProduction, true));
 
   if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
