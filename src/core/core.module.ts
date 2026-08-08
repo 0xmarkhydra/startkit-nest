@@ -4,7 +4,6 @@ import { LoggerModule } from 'nestjs-pino';
 import { configCache } from '@/api/configs/cache';
 import { configDb } from '@/database/configs';
 import { configQueue } from '@/queue/configs';
-import { RedisModule } from '@/redis/redis.module';
 import { validateEnvironment } from './env.validation';
 
 @Global()
@@ -17,7 +16,6 @@ import { validateEnvironment } from './env.validation';
       validate: validateEnvironment,
       load: [configCache, configDb, configQueue],
     }),
-    RedisModule,
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -67,6 +65,6 @@ import { validateEnvironment } from './env.validation';
       },
     }),
   ],
-  exports: [ConfigModule, LoggerModule, RedisModule],
+  exports: [ConfigModule, LoggerModule],
 })
 export class CoreModule {}
