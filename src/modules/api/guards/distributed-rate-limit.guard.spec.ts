@@ -1,4 +1,4 @@
-import { ExecutionContext, HttpException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { RedisService } from '@/redis/redis.service';
@@ -73,7 +73,7 @@ describe('DistributedRateLimitGuard', () => {
 
     await expect(guard.canActivate(context)).rejects.toMatchObject({
       status: 429,
-    } satisfies Partial<HttpException>);
+    });
   });
 
   it('can fail open when Redis is unavailable', async () => {
