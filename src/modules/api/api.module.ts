@@ -2,19 +2,15 @@ import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { redisStore } from 'cache-manager-redis-store';
 import { DatabaseModule } from '@/database';
 import { QueueModule } from '@/queue/queue.module';
 import { HealthController } from './controllers';
+import { DistributedRateLimitGuard } from './guards/distributed-rate-limit.guard';
 import { FormatResponseInterceptor } from './interceptors';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot({
-      ttl: 60,
-      limit: process.env.APP_ENV === 'production' ? 60 : 600,
-    }),
     DatabaseModule,
     QueueModule,
     CacheModule.registerAsync({
@@ -34,6 +30,7 @@ import { FormatResponseInterceptor } from './interceptors';
           process.env.REDIS_URL ||
           `redis://${credentials}${host}:${port}/${database}`;
         const ttl = configService.get<number>('cache.api.cache_ttl') || 10000;
+        const isProduction = configService.get('APP_ENV') === 'production';
 
         try {
           const store = await redisStore({
@@ -45,7 +42,11 @@ import { FormatResponseInterceptor } from './interceptors';
             ttl,
             store: store as unknown as CacheStore,
           };
-        } catch {
+        } catch (error) {
+          if (isProduction) {
+            throw error;
+          }
+
           return { ttl };
         }
       },
@@ -55,7 +56,7 @@ import { FormatResponseInterceptor } from './interceptors';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: DistributedRateLimitGuard,
     },
     {
       provide: APP_INTERCEPTOR,
