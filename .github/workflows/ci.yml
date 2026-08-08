@@ -75,7 +75,9 @@ jobs:
         run: pnpm run test:e2e
 
       - name: Validate Docker Compose
-        run: docker compose config --quiet
+        run: |
+          cp .env.sample .env
+          docker compose config --quiet
 
       - name: Validate Nginx gateway
         run: >-
