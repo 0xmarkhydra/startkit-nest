@@ -13,7 +13,7 @@
     "^@/database/(.*)$": "<rootDir>/../src/modules/database/$1",
     "^@/shared/(.*)$": "<rootDir>/../src/shared/$1",
     "^@/worker/(.*)$": "<rootDir>/../src/modules/worker/$1",
-    "^@/business/(.*)$": "<rootDir>/../src/modules/business/$1",
-    "^@/queue/(.*)$": "<rootDir>/../src/modules/queue/$1"
+    "^@/queue/(.*)$": "<rootDir>/../src/modules/queue/$1",
+    "^@/redis/(.*)$": "<rootDir>/../src/modules/redis/$1"
   }
 }

@@ -2,134 +2,123 @@ import {
   ArgumentsHost,
   Catch,
   ExceptionFilter,
+  HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
-// import { JsonLogger, LoggerFactory } from 'json-logger-service';
-import { v1 as uuidv1 } from 'uuid';
-import { IntegrationError } from './IntegrationError';
+import { randomUUID } from 'crypto';
 
-// https://github.com/marciopd/nestjs-exceptions
+interface HttpRequestLike {
+  method?: string;
+  url?: string;
+}
+
+interface HttpReplyLike {
+  status(code: number): HttpReplyLike;
+  send(payload: unknown): unknown;
+}
+
+interface ErrorResponse {
+  statusCode: number;
+  message: string | string[];
+  error?: string;
+  errorId?: string;
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private static extractIntegrationErrorDetails(error: any): string {
-    if (!(error instanceof IntegrationError)) {
-      return undefined;
-    }
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
 
-    if (!error.causeError) {
-      return undefined;
-    }
-
-    if (error.causeError instanceof String) {
-      return error.causeError as string;
-    }
-
-    if (!error.causeError.message && !error.causeError.response) {
-      return undefined;
-    }
-
-    const integrationErrorDetails = {
-      message: error.causeError.message,
-      details: error.causeError.response && error.causeError.response.data,
-    };
-    return JSON.stringify({ causeError: integrationErrorDetails });
-  }
-
-  // private logger: JsonLogger = LoggerFactory.createLogger(
-  //   GlobalExceptionFilter.name,
-  // );
-
-  public constructor(
-    private readonly sendClientInternalServerErrorCause: boolean = false,
-    private readonly logAllErrors: boolean = false,
-    private readonly logErrorsWithStatusCode: number[] = [],
+  constructor(
+    private readonly exposeInternalErrors = false,
+    private readonly logAllErrors = false,
   ) {}
 
-  public catch(exception: any, host: ArgumentsHost): any {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+  catch(exception: unknown, host: ArgumentsHost): void {
+    const context = host.switchToHttp();
+    const response = context.getResponse<HttpReplyLike>();
+    const request = context.getRequest<HttpRequestLike>();
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const normalized = this.normalizeException(exception, status);
 
-    const responseStatus = exception.status
-      ? exception.status
-      : HttpStatus.INTERNAL_SERVER_ERROR;
-    const messageObject = this.getBackwardsCompatibleMessageObject(
-      exception,
-      responseStatus,
-    );
-    let errorId = undefined;
-    let integrationErrorDetails = undefined;
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const errorId = randomUUID();
+      if (!this.shouldSuppressErrorLog(exception)) {
+        this.logger.error(
+          `${request.method || 'HTTP'} ${request.url || 'unknown'} failed [${errorId}]`,
+          exception instanceof Error ? exception.stack : String(exception),
+        );
+      }
 
-    if (responseStatus === HttpStatus.INTERNAL_SERVER_ERROR) {
-      errorId = uuidv1();
-      integrationErrorDetails =
-        GlobalExceptionFilter.extractIntegrationErrorDetails(exception);
+      response.status(status).send({
+        statusCode: status,
+        message: this.exposeInternalErrors
+          ? normalized.message
+          : 'Internal server error',
+        ...(normalized.error ? { error: normalized.error } : {}),
+        errorId,
+      } satisfies ErrorResponse);
+      return;
+    }
 
-      console.error(
-        {
-          errorId: errorId,
-          route: request.url,
-          integrationErrorDetails,
-          stack:
-            exception.stack && JSON.stringify(exception.stack, ['stack'], 4),
-        },
-        messageObject,
-      );
-    } else if (
-      this.logAllErrors ||
-      this.logErrorsWithStatusCode.indexOf(responseStatus) !== -1
-    ) {
-      console.error(
-        {
-          route: request.url,
-          stack: exception.stack && JSON.stringify(exception.stack),
-        },
-        messageObject,
+    if (this.logAllErrors) {
+      this.logger.warn(
+        `${request.method || 'HTTP'} ${request.url || 'unknown'} returned ${status}: ${JSON.stringify(normalized.message)}`,
       );
     }
 
-    response.status(responseStatus).json({
-      errorId: errorId,
-      ...this.getClientResponseMessage(responseStatus, exception),
-      integrationErrorDetails:
-        responseStatus === HttpStatus.INTERNAL_SERVER_ERROR &&
-        this.sendClientInternalServerErrorCause
-          ? integrationErrorDetails
-          : undefined,
-    });
+    response.status(status).send(normalized);
   }
 
-  private getClientResponseMessage(
-    responseStatus: number,
-    exception: any,
-  ): any {
+  private shouldSuppressErrorLog(exception: unknown): boolean {
+    if (!(exception instanceof HttpException)) {
+      return false;
+    }
+
+    const exceptionResponse = exception.getResponse();
     if (
-      responseStatus !== HttpStatus.INTERNAL_SERVER_ERROR ||
-      (responseStatus === HttpStatus.INTERNAL_SERVER_ERROR &&
-        this.sendClientInternalServerErrorCause)
+      typeof exceptionResponse !== 'object' ||
+      exceptionResponse === null ||
+      Array.isArray(exceptionResponse)
     ) {
-      return this.getBackwardsCompatibleMessageObject(
-        exception,
-        responseStatus,
-      );
+      return false;
     }
 
-    return 'Internal server error.';
+    return (
+      (exceptionResponse as Record<string, unknown>).suppressErrorLog === true
+    );
   }
 
-  private getBackwardsCompatibleMessageObject(
-    exception: any,
-    responseStatus: number,
-  ): any {
-    const errorResponse = exception.response;
-    if (errorResponse && errorResponse.error) {
+  private normalizeException(
+    exception: unknown,
+    status: number,
+  ): ErrorResponse {
+    if (!(exception instanceof HttpException)) {
       return {
-        error: errorResponse.error,
-        message: errorResponse.message,
-        statusCode: responseStatus,
+        statusCode: status,
+        message: exception instanceof Error ? exception.message : 'Unknown error',
       };
     }
-    return { message: exception.message, statusCode: responseStatus };
+
+    const exceptionResponse = exception.getResponse();
+    if (typeof exceptionResponse === 'string') {
+      return {
+        statusCode: status,
+        message: exceptionResponse,
+      };
+    }
+
+    const payload = exceptionResponse as Record<string, unknown>;
+    return {
+      statusCode: status,
+      message:
+        typeof payload.message === 'string' || Array.isArray(payload.message)
+          ? (payload.message as string | string[])
+          : exception.message,
+      ...(typeof payload.error === 'string' ? { error: payload.error } : {}),
+    };
   }
 }

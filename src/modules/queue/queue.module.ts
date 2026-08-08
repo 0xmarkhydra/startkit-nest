@@ -8,18 +8,28 @@ import { QueueService } from './queue.service';
   imports: [
     BullModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        redis: {
-          host: configService.getOrThrow<string>('queue.host'),
-          port: configService.getOrThrow<number>('queue.port'),
-          db: configService.get<number>('queue.database') || 0,
-          username: configService.get<string>('queue.username'),
-          password: configService.get<string>('queue.password'),
-          family: configService.get<number>('queue.family') || 0,
-          retryStrategy: (times: number) => Math.min(times * 100, 3000),
-          enableOfflineQueue: true,
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const url = configService.get<string>('redis.url');
+        if (url) {
+          return {
+            redis: url,
+          };
+        }
+
+        const family = configService.get<number>('redis.family');
+        return {
+          redis: {
+            host: configService.getOrThrow<string>('redis.host'),
+            port: configService.getOrThrow<number>('redis.port'),
+            db: configService.get<number>('redis.database') || 0,
+            username: configService.get<string>('redis.username') || undefined,
+            password: configService.get<string>('redis.password') || undefined,
+            ...(family === 4 || family === 6 ? { family } : {}),
+            retryStrategy: (times: number) => Math.min(times * 100, 3000),
+            enableOfflineQueue: true,
+          },
+        };
+      },
     }),
     BullModule.registerQueue({
       name: QUEUE_NAME.SAMPLE,

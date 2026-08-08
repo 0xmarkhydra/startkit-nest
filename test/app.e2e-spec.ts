@@ -1,18 +1,19 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { getQueueToken } from '@nestjs/bull';
-import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Queue } from 'bull';
-import { QUEUE_NAME } from '@/shared/constants/queue';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { RedisService } from '@/redis/redis.service';
 
 jest.setTimeout(30000);
 
 describe('HealthController (e2e)', () => {
-  let app: INestApplication;
+  let app: NestFastifyApplication;
   let baseUrl: string;
 
   beforeAll(async () => {
     process.env.APP_ENV = 'test';
+    process.env.RATE_LIMIT_MAX = '1000';
     process.env.DATABASE_URL =
       process.env.DATABASE_URL ||
       'postgresql://startkit:startkit@localhost:5432/startkit';
@@ -24,32 +25,15 @@ describe('HealthController (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
     await app.listen(0, '127.0.0.1');
     baseUrl = await app.getUrl();
   });
 
   afterAll(async () => {
-    if (!app) {
-      return;
-    }
-
-    const queue = app.get<Queue>(getQueueToken(QUEUE_NAME.SAMPLE), {
-      strict: false,
-    });
-    await queue.close().catch(() => undefined);
-
-    const cacheManager = app.get<any>(CACHE_MANAGER, { strict: false });
-    const cacheStore = cacheManager?.store;
-    const cacheClient = cacheStore?.client || cacheStore?.getClient?.();
-
-    if (typeof cacheClient?.quit === 'function') {
-      await Promise.resolve(cacheClient.quit()).catch(() => undefined);
-    } else if (typeof cacheClient?.disconnect === 'function') {
-      cacheClient.disconnect();
-    }
-
-    await app.close();
+    await app?.close();
   });
 
   it('GET /health returns the standardized response', async () => {
@@ -63,8 +47,38 @@ describe('HealthController (e2e)', () => {
       data: {
         status: 'ok',
         service: 'api',
+        instanceId: expect.any(String),
       },
     });
     expect(body.timestamp).toEqual(expect.any(String));
+  });
+
+  it('GET /health/ready checks PostgreSQL and Redis', async () => {
+    const response = await fetch(`${baseUrl}/health/ready`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      status_code: 200,
+      data: {
+        status: 'ready',
+        database: 'connected',
+        redis: 'connected',
+      },
+    });
+  });
+
+  it('caps rate-limit storage at the configured limit', async () => {
+    const redisService = app.get(RedisService);
+    const key = `e2e:rate-limit:${Date.now()}:${Math.random()}`;
+
+    const first = await redisService.consumeSlidingWindow(key, 1, 2);
+    const second = await redisService.consumeSlidingWindow(key, 1, 2);
+    const blocked = await redisService.consumeSlidingWindow(key, 1, 2);
+
+    expect(first).toMatchObject({ allowed: true, totalHits: 1 });
+    expect(second).toMatchObject({ allowed: true, totalHits: 2 });
+    expect(blocked).toMatchObject({ allowed: false, totalHits: 2 });
+    expect(blocked.timeToExpire).toBeGreaterThanOrEqual(1);
   });
 });
