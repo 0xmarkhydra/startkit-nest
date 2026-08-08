@@ -60,7 +60,9 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.useGlobalFilters(new GlobalExceptionFilter(!isProduction, true));
+  app.useGlobalFilters(
+    new GlobalExceptionFilter(!isProduction, !isProduction),
+  );
 
   if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
