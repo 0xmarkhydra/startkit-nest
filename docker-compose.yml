@@ -32,6 +32,7 @@ services:
     env_file:
       - .env
     environment:
+      APP_ENV: production
       DATABASE_URL: postgresql://startkit:startkit@postgres:5432/startkit
       REDIS_URL: redis://redis:6379/0
       TRUST_PROXY: "1"
@@ -63,6 +64,7 @@ services:
     env_file:
       - .env
     environment:
+      APP_ENV: production
       DATABASE_URL: postgresql://startkit:startkit@postgres:5432/startkit
       REDIS_URL: redis://redis:6379/0
     command: ["node", "dist/worker.js"]
