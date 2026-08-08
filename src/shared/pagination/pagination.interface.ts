@@ -1,11 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
 
-export interface IPaginateRequest {
-  take?: number;
-  page?: number;
-}
-
 export class PaginationResponse {
   @ApiPropertyOptional()
   @Expose()
