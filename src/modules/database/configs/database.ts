@@ -1,32 +1,24 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-/**
- * Parse DATABASE_URL into connection parameters
- * Format: postgresql://username:password@host:port/database
- */
 const parseDatabaseUrl = (url: string) => {
-  try {
-    const parsedUrl = new URL(url);
-    return {
-      host: parsedUrl.hostname,
-      port: parsedUrl.port ? Number(parsedUrl.port) : 5432,
-      username: parsedUrl.username,
-      password: parsedUrl.password,
-      database: parsedUrl.pathname.slice(1), // Remove leading '/'
-    };
-  } catch (error) {
-    console.log(`[⚠️] [database.config] [parseDatabaseUrl] [error]:`, error);
-    return null;
-  }
+  const parsedUrl = new URL(url);
+
+  return {
+    host: parsedUrl.hostname,
+    port: parsedUrl.port ? Number(parsedUrl.port) : 5432,
+    username: decodeURIComponent(parsedUrl.username),
+    password: decodeURIComponent(parsedUrl.password),
+    database: parsedUrl.pathname.slice(1),
+  };
 };
 
 export const configDb = registerAs(
   'db',
   (): TypeOrmModuleOptions => {
-    // Parse DATABASE_URL if available (higher priority)
     const databaseUrl = process.env.DATABASE_URL;
     const parsedUrl = databaseUrl ? parseDatabaseUrl(databaseUrl) : null;
+    const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
 
     return {
       type: 'postgres',
@@ -38,6 +30,14 @@ export const configDb = registerAs(
       synchronize: Boolean(Number(process.env.DB_SYNC)) || false,
       autoLoadEntities: true,
       logging: Boolean(Number(process.env.DB_DEBUG)) || false,
+      poolSize: Number(process.env.DB_POOL_MAX) || 10,
+      extra: {
+        connectionTimeoutMillis:
+          Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 5000,
+        idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+        statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS) || 30000,
+        application_name: `startkit:${instanceId}`,
+      },
     };
   },
 );
