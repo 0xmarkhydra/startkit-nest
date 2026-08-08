@@ -104,6 +104,11 @@ export function validateEnvironment(config: Environment): Environment {
       'RATE_LIMIT_TTL_SECONDS',
     ),
     RATE_LIMIT_FAIL_OPEN: parseBooleanFlag(config.RATE_LIMIT_FAIL_OPEN, false),
+    WORKER_CONCURRENCY: parseInteger(
+      config.WORKER_CONCURRENCY,
+      10,
+      'WORKER_CONCURRENCY',
+    ),
     HTTP_BODY_LIMIT_BYTES: parseInteger(
       config.HTTP_BODY_LIMIT_BYTES,
       1048576,
