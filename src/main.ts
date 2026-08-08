@@ -9,36 +9,24 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
-
-const parseTrustProxy = (): boolean | string => {
-  const value = process.env.TRUST_PROXY?.trim();
-  if (!value || value === '0' || value.toLowerCase() === 'false') {
-    return false;
-  }
-  if (value === '1' || value.toLowerCase() === 'true') {
-    return true;
-  }
-  return value;
-};
-
-const parsePositiveNumber = (value: string | undefined, fallback: number) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
+import { parsePositiveIntegerEnv, parseTrustProxy } from './core/http-options';
 
 async function bootstrap() {
   const adapter = new FastifyAdapter({
     trustProxy: parseTrustProxy(),
-    bodyLimit: parsePositiveNumber(process.env.HTTP_BODY_LIMIT_BYTES, 1048576),
-    requestTimeout: parsePositiveNumber(
+    bodyLimit: parsePositiveIntegerEnv(
+      process.env.HTTP_BODY_LIMIT_BYTES,
+      1048576,
+    ),
+    requestTimeout: parsePositiveIntegerEnv(
       process.env.HTTP_REQUEST_TIMEOUT_MS,
       30000,
     ),
-    connectionTimeout: parsePositiveNumber(
+    connectionTimeout: parsePositiveIntegerEnv(
       process.env.HTTP_CONNECTION_TIMEOUT_MS,
       10000,
     ),
-    keepAliveTimeout: parsePositiveNumber(
+    keepAliveTimeout: parsePositiveIntegerEnv(
       process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS,
       65000,
     ),
