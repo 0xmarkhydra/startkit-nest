@@ -24,6 +24,9 @@ interface HttpReplyLike {
 @Injectable()
 export class DistributedRateLimitGuard implements CanActivate {
   private readonly logger = new Logger(DistributedRateLimitGuard.name);
+  private limiterUnavailable = false;
+  private lastFailureLogAt = 0;
+  private readonly failureLogIntervalMs = 30000;
 
   constructor(
     private readonly configService: ConfigService,
@@ -53,38 +56,19 @@ export class DistributedRateLimitGuard implements CanActivate {
       .digest('hex');
     const key = `startkit:rate-limit:${digest}`;
 
+    let record;
     try {
-      const { totalHits, timeToExpire } =
-        await this.redisService.consumeSlidingWindow(key, ttlSeconds);
-
-      response.header('X-RateLimit-Limit', limit);
-      response.header('X-RateLimit-Remaining', Math.max(0, limit - totalHits));
-      response.header('X-RateLimit-Reset', timeToExpire);
-
-      if (totalHits > limit) {
-        response.header('Retry-After', timeToExpire);
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.TOO_MANY_REQUESTS,
-            message: 'Too many requests',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      return true;
+      record = await this.redisService.consumeSlidingWindow(
+        key,
+        ttlSeconds,
+        limit,
+      );
+      this.markLimiterHealthy();
     } catch (error) {
-      if (
-        error instanceof HttpException &&
-        error.getStatus() === HttpStatus.TOO_MANY_REQUESTS
-      ) {
-        throw error;
-      }
-
       const failOpen =
         this.configService.get<boolean>('RATE_LIMIT_FAIL_OPEN') ?? false;
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Distributed rate limiter failed: ${message}`);
+      this.markLimiterUnavailable(message);
 
       if (failOpen) {
         return true;
@@ -92,5 +76,44 @@ export class DistributedRateLimitGuard implements CanActivate {
 
       throw new ServiceUnavailableException('Rate limiting service unavailable');
     }
+
+    response.header('X-RateLimit-Limit', limit);
+    response.header('X-RateLimit-Remaining', Math.max(0, limit - record.totalHits));
+    response.header('X-RateLimit-Reset', record.timeToExpire);
+
+    if (!record.allowed) {
+      response.header('Retry-After', record.timeToExpire);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: 'Too many requests',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    return true;
+  }
+
+  private markLimiterUnavailable(message: string): void {
+    const now = Date.now();
+    if (
+      !this.limiterUnavailable ||
+      now - this.lastFailureLogAt >= this.failureLogIntervalMs
+    ) {
+      this.logger.error(`Distributed rate limiter unavailable: ${message}`);
+      this.lastFailureLogAt = now;
+    }
+    this.limiterUnavailable = true;
+  }
+
+  private markLimiterHealthy(): void {
+    if (!this.limiterUnavailable) {
+      return;
+    }
+
+    this.limiterUnavailable = false;
+    this.lastFailureLogAt = 0;
+    this.logger.log('Distributed rate limiter recovered');
   }
 }
