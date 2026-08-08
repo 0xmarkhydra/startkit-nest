@@ -5,6 +5,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { redisStore } from 'cache-manager-redis-store';
 import { DatabaseModule } from '@/database';
 import { QueueModule } from '@/queue/queue.module';
+import { RedisModule } from '@/redis/redis.module';
 import { HealthController } from './controllers';
 import { DistributedRateLimitGuard } from './guards/distributed-rate-limit.guard';
 import { FormatResponseInterceptor } from './interceptors';
@@ -13,6 +14,7 @@ import { FormatResponseInterceptor } from './interceptors';
   imports: [
     DatabaseModule,
     QueueModule,
+    RedisModule,
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
