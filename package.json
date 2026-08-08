@@ -80,6 +80,16 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^@/api$": "<rootDir>/modules/api/index",
+      "^@/api/(.*)$": "<rootDir>/modules/api/$1",
+      "^@/database$": "<rootDir>/modules/database/index",
+      "^@/database/(.*)$": "<rootDir>/modules/database/$1",
+      "^@/shared/(.*)$": "<rootDir>/shared/$1",
+      "^@/worker/(.*)$": "<rootDir>/modules/worker/$1",
+      "^@/queue/(.*)$": "<rootDir>/modules/queue/$1",
+      "^@/redis/(.*)$": "<rootDir>/modules/redis/$1"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
