@@ -74,7 +74,11 @@ export class DistributedRateLimitGuard implements CanActivate {
         return true;
       }
 
-      throw new ServiceUnavailableException('Rate limiting service unavailable');
+      throw new ServiceUnavailableException({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'Rate limiting service unavailable',
+        suppressErrorLog: true,
+      });
     }
 
     response.header('X-RateLimit-Limit', limit);
