@@ -1,13 +1,9 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { getQueueToken } from '@nestjs/bull';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { Queue } from 'bull';
 import { RedisService } from '@/redis/redis.service';
-import { QUEUE_NAME } from '@/shared/constants/queue';
 
 jest.setTimeout(30000);
 
@@ -37,26 +33,7 @@ describe('HealthController (e2e)', () => {
   });
 
   afterAll(async () => {
-    if (!app) {
-      return;
-    }
-
-    const queue = app.get<Queue>(getQueueToken(QUEUE_NAME.SAMPLE), {
-      strict: false,
-    });
-    await queue.close().catch(() => undefined);
-
-    const cacheManager = app.get<any>(CACHE_MANAGER, { strict: false });
-    const cacheStore = cacheManager?.store;
-    const cacheClient = cacheStore?.client || cacheStore?.getClient?.();
-
-    if (typeof cacheClient?.quit === 'function') {
-      await Promise.resolve(cacheClient.quit()).catch(() => undefined);
-    } else if (typeof cacheClient?.disconnect === 'function') {
-      cacheClient.disconnect();
-    }
-
-    await app.close();
+    await app?.close();
   });
 
   it('GET /health returns the standardized response', async () => {
@@ -91,15 +68,17 @@ describe('HealthController (e2e)', () => {
     });
   });
 
-  it('stores rate-limit windows in Redis', async () => {
+  it('caps rate-limit storage at the configured limit', async () => {
     const redisService = app.get(RedisService);
     const key = `e2e:rate-limit:${Date.now()}:${Math.random()}`;
 
-    const first = await redisService.consumeSlidingWindow(key, 1);
-    const second = await redisService.consumeSlidingWindow(key, 1);
+    const first = await redisService.consumeSlidingWindow(key, 1, 2);
+    const second = await redisService.consumeSlidingWindow(key, 1, 2);
+    const blocked = await redisService.consumeSlidingWindow(key, 1, 2);
 
-    expect(first.totalHits).toBe(1);
-    expect(second.totalHits).toBe(2);
-    expect(second.timeToExpire).toBeGreaterThanOrEqual(1);
+    expect(first).toMatchObject({ allowed: true, totalHits: 1 });
+    expect(second).toMatchObject({ allowed: true, totalHits: 2 });
+    expect(blocked).toMatchObject({ allowed: false, totalHits: 2 });
+    expect(blocked.timeToExpire).toBeGreaterThanOrEqual(1);
   });
 });
