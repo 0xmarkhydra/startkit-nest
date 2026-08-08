@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Redis, { RedisOptions } from 'ioredis';
 
 export interface RateLimitRecord {
+  allowed: boolean;
   totalHits: number;
   timeToExpire: number;
 }
@@ -10,11 +11,21 @@ export interface RateLimitRecord {
 const SLIDING_WINDOW_SCRIPT = `
 local key = KEYS[1]
 local ttl = tonumber(ARGV[1])
+local limit = tonumber(ARGV[2])
 local now = redis.call('TIME')
 local nowMs = (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
 local cutoff = nowMs - ttl
 
 redis.call('ZREMRANGEBYSCORE', key, '-inf', cutoff)
+
+local count = redis.call('ZCARD', key)
+local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+local oldestScore = tonumber(oldest[2]) or nowMs
+local remainingMs = math.max(0, (oldestScore + ttl) - nowMs)
+
+if count >= limit then
+  return { 0, count, math.ceil(remainingMs / 1000) }
+end
 
 local sequenceKey = key .. ':sequence'
 local sequence = redis.call('INCR', sequenceKey)
@@ -24,12 +35,12 @@ redis.call('ZADD', key, nowMs, member)
 redis.call('PEXPIRE', key, ttl)
 redis.call('PEXPIRE', sequenceKey, ttl)
 
-local count = redis.call('ZCARD', key)
-local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
-local oldestScore = tonumber(oldest[2]) or nowMs
-local remainingMs = math.max(0, (oldestScore + ttl) - nowMs)
+count = count + 1
+oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+oldestScore = tonumber(oldest[2]) or nowMs
+remainingMs = math.max(0, (oldestScore + ttl) - nowMs)
 
-return { count, math.ceil(remainingMs / 1000) }
+return { 1, count, math.ceil(remainingMs / 1000) }
 `;
 
 @Injectable()
@@ -42,19 +53,19 @@ export class RedisService implements OnApplicationShutdown {
       enableReadyCheck: true,
       maxRetriesPerRequest: 2,
     };
-    const redisUrl = process.env.REDIS_URL;
+    const redisUrl = this.configService.get<string>('redis.url');
 
     if (redisUrl) {
       this.client = new Redis(redisUrl, commonOptions);
     } else {
-      const family = this.configService.get<number>('queue.family');
+      const family = this.configService.get<number>('redis.family');
       this.client = new Redis({
         ...commonOptions,
-        host: this.configService.getOrThrow<string>('queue.host'),
-        port: this.configService.getOrThrow<number>('queue.port'),
-        db: this.configService.get<number>('queue.database') || 0,
-        username: this.configService.get<string>('queue.username') || undefined,
-        password: this.configService.get<string>('queue.password') || undefined,
+        host: this.configService.getOrThrow<string>('redis.host'),
+        port: this.configService.getOrThrow<number>('redis.port'),
+        db: this.configService.get<number>('redis.database') || 0,
+        username: this.configService.get<string>('redis.username') || undefined,
+        password: this.configService.get<string>('redis.password') || undefined,
         ...(family === 4 || family === 6 ? { family } : {}),
       });
     }
@@ -71,18 +82,22 @@ export class RedisService implements OnApplicationShutdown {
   async consumeSlidingWindow(
     key: string,
     ttlSeconds: number,
+    limit: number,
   ): Promise<RateLimitRecord> {
     const ttlMilliseconds = Math.max(1, ttlSeconds) * 1000;
+    const safeLimit = Math.max(1, Math.floor(limit));
     const result = (await this.client.eval(
       SLIDING_WINDOW_SCRIPT,
       1,
       key,
       ttlMilliseconds,
-    )) as [number, number];
+      safeLimit,
+    )) as [number, number, number];
 
     return {
-      totalHits: Number(result[0]),
-      timeToExpire: Math.max(1, Number(result[1])),
+      allowed: Number(result[0]) === 1,
+      totalHits: Number(result[1]),
+      timeToExpire: Math.max(1, Number(result[2])),
     };
   }
 
