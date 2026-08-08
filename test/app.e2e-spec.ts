@@ -6,6 +6,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Queue } from 'bull';
+import { RedisService } from '@/redis/redis.service';
 import { QUEUE_NAME } from '@/shared/constants/queue';
 
 jest.setTimeout(30000);
@@ -88,5 +89,17 @@ describe('HealthController (e2e)', () => {
         redis: 'connected',
       },
     });
+  });
+
+  it('stores rate-limit windows in Redis', async () => {
+    const redisService = app.get(RedisService);
+    const key = `e2e:rate-limit:${Date.now()}:${Math.random()}`;
+
+    const first = await redisService.consumeSlidingWindow(key, 1);
+    const second = await redisService.consumeSlidingWindow(key, 1);
+
+    expect(first.totalHits).toBe(1);
+    expect(second.totalHits).toBe(2);
+    expect(second.timeToExpire).toBeGreaterThanOrEqual(1);
   });
 });
