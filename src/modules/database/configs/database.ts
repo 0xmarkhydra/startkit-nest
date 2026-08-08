@@ -1,32 +1,24 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-const parseDatabaseUrl = (url: string) => {
-  const parsedUrl = new URL(url);
-
-  return {
-    host: parsedUrl.hostname,
-    port: parsedUrl.port ? Number(parsedUrl.port) : 5432,
-    username: decodeURIComponent(parsedUrl.username),
-    password: decodeURIComponent(parsedUrl.password),
-    database: parsedUrl.pathname.slice(1),
-  };
-};
-
 export const configDb = registerAs(
   'db',
   (): TypeOrmModuleOptions => {
-    const databaseUrl = process.env.DATABASE_URL;
-    const parsedUrl = databaseUrl ? parseDatabaseUrl(databaseUrl) : null;
+    const databaseUrl = process.env.DATABASE_URL?.trim();
     const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
+    const connection = databaseUrl
+      ? { url: databaseUrl }
+      : {
+          host: process.env.DB_HOST || 'localhost',
+          port: Number(process.env.DB_PORT) || 5432,
+          username: process.env.DB_USERNAME || 'root',
+          password: process.env.DB_PASSWORD || 'root',
+          database: process.env.DB_DATABASE || 'postgres',
+        };
 
     return {
       type: 'postgres',
-      host: parsedUrl?.host || process.env.DB_HOST || 'localhost',
-      port: parsedUrl?.port || Number(process.env.DB_PORT) || 5432,
-      username: parsedUrl?.username || process.env.DB_USERNAME || 'root',
-      password: parsedUrl?.password || process.env.DB_PASSWORD || 'root',
-      database: parsedUrl?.database || process.env.DB_DATABASE || 'postgres',
+      ...connection,
       synchronize: Boolean(Number(process.env.DB_SYNC)) || false,
       autoLoadEntities: true,
       logging: Boolean(Number(process.env.DB_DEBUG)) || false,
