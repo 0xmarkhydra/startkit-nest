@@ -1,3 +1,5 @@
+import { isIP } from 'net';
+
 type Environment = Record<string, unknown>;
 
 const APP_ENVIRONMENTS = new Set(['development', 'test', 'production']);
@@ -55,6 +57,85 @@ const parseBooleanFlag = (value: unknown, fallback = false): boolean => {
   throw new Error(`Invalid boolean value: ${String(value)}`);
 };
 
+const validateCorsOrigins = (value: unknown, appEnv: string): string[] => {
+  const origins = String(value || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  for (const origin of origins) {
+    if (origin === '*') {
+      if (appEnv === 'production') {
+        throw new Error(
+          'CORS_ORIGIN cannot contain * in production while credentialed CORS is enabled',
+        );
+      }
+      continue;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new Error(`Invalid CORS_ORIGIN value: ${origin}`);
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== origin) {
+      throw new Error(
+        `Invalid CORS_ORIGIN value: ${origin}. Use an exact http(s) origin without a path`,
+      );
+    }
+  }
+
+  return origins;
+};
+
+const isValidProxyAddress = (value: string): boolean => {
+  const [address, prefix, ...extra] = value.split('/');
+  if (!address || extra.length > 0) {
+    return false;
+  }
+
+  const family = isIP(address);
+  if (family === 0) {
+    return false;
+  }
+
+  if (prefix === undefined) {
+    return true;
+  }
+  if (!/^\d+$/.test(prefix)) {
+    return false;
+  }
+
+  const prefixLength = Number(prefix);
+  return prefixLength >= 0 && prefixLength <= (family === 4 ? 32 : 128);
+};
+
+const validateTrustProxy = (value: unknown, appEnv: string): string => {
+  const normalized = String(value ?? '0').trim().toLowerCase();
+
+  if (['0', 'false'].includes(normalized)) {
+    return '0';
+  }
+  if (normalized === 'true') {
+    if (appEnv === 'production') {
+      throw new Error(
+        'TRUST_PROXY=true is not allowed in production. Use a bounded hop count or explicit proxy IP/CIDR',
+      );
+    }
+    return 'true';
+  }
+  if (/^[1-9]\d*$/.test(normalized)) {
+    return normalized;
+  }
+  if (isValidProxyAddress(normalized)) {
+    return normalized;
+  }
+
+  throw new Error(`Invalid TRUST_PROXY value: ${String(value)}`);
+};
+
 export function validateEnvironment(config: Environment): Environment {
   const appEnv = String(config.APP_ENV || 'development').trim().toLowerCase();
   if (!APP_ENVIRONMENTS.has(appEnv)) {
@@ -72,15 +153,8 @@ export function validateEnvironment(config: Environment): Environment {
     throw new Error(`Invalid LOG_LEVEL value: ${String(config.LOG_LEVEL)}`);
   }
 
-  const corsOrigins = String(config.CORS_ORIGIN || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  if (appEnv === 'production' && corsOrigins.includes('*')) {
-    throw new Error(
-      'CORS_ORIGIN cannot contain * in production while credentialed CORS is enabled',
-    );
-  }
+  const corsOrigins = validateCorsOrigins(config.CORS_ORIGIN, appEnv);
+  const trustProxy = validateTrustProxy(config.TRUST_PROXY, appEnv);
 
   const hasRedisUrl = hasValue(config.REDIS_URL);
   const hasRedisHost = hasValue(config.REDIS_HOST);
@@ -99,6 +173,8 @@ export function validateEnvironment(config: Environment): Environment {
     ...config,
     APP_ENV: appEnv,
     LOG_LEVEL: logLevel,
+    CORS_ORIGIN: corsOrigins.join(','),
+    TRUST_PROXY: trustProxy,
     PORT: parsePort(config.PORT, 8000),
     REDIS_PORT: parsePort(config.REDIS_PORT, 6379),
     REDIS_DATABASE: parseInteger(
@@ -108,6 +184,16 @@ export function validateEnvironment(config: Environment): Environment {
       0,
     ),
     REDIS_FAMILY: redisFamily,
+    REDIS_CONNECT_TIMEOUT_MS: parseInteger(
+      config.REDIS_CONNECT_TIMEOUT_MS,
+      5000,
+      'REDIS_CONNECT_TIMEOUT_MS',
+    ),
+    REDIS_COMMAND_TIMEOUT_MS: parseInteger(
+      config.REDIS_COMMAND_TIMEOUT_MS,
+      2000,
+      'REDIS_COMMAND_TIMEOUT_MS',
+    ),
     RATE_LIMIT_MAX: parseInteger(
       config.RATE_LIMIT_MAX,
       appEnv === 'production' ? 60 : 600,
