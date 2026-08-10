@@ -50,6 +50,14 @@ describe('configDb', () => {
     expect(() => configDb()).toThrow('DB_SYNC must be disabled in production');
   });
 
+  it('rejects DB_SYNC in production regardless of APP_ENV casing', () => {
+    process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/app';
+    process.env.APP_ENV = ' Production ';
+    process.env.DB_SYNC = '1';
+
+    expect(() => configDb()).toThrow('DB_SYNC must be disabled in production');
+  });
+
   it('parses explicit boolean flags and pool sizing', () => {
     process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/app';
     process.env.APP_ENV = 'test';
