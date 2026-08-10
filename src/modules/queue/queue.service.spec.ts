@@ -4,7 +4,8 @@ import { QueueService, SampleJobPayload } from './queue.service';
 
 describe('QueueService', () => {
   it('adds sample jobs with bounded retry, backoff and timeout defaults', async () => {
-    const add = jest.fn().mockResolvedValue({ id: 'job-1' } as Job<SampleJobPayload>);
+    const mockJob = { id: 'job-1' } as unknown as Job<SampleJobPayload>;
+    const add = jest.fn().mockResolvedValue(mockJob);
     const queue = { add } as unknown as Queue<SampleJobPayload>;
     const service = new QueueService(queue);
     const payload: SampleJobPayload = { message: 'hello' };
