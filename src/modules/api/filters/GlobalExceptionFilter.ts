@@ -18,11 +18,17 @@ interface HttpReplyLike {
   send(payload: unknown): unknown;
 }
 
-interface ErrorResponse {
-  statusCode: number;
+interface NormalizedException {
   message: string | string[];
   error?: string;
-  errorId?: string;
+}
+
+interface ErrorResponse {
+  status_code: number;
+  message: string | string[];
+  timestamp: string;
+  error?: string;
+  error_id?: string;
 }
 
 @Catch()
@@ -42,7 +48,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
-    const normalized = this.normalizeException(exception, status);
+    const normalized = this.normalizeException(exception);
+    const timestamp = new Date().toISOString();
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       const errorId = randomUUID();
@@ -54,12 +61,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
 
       response.status(status).send({
-        statusCode: status,
+        status_code: status,
         message: this.exposeInternalErrors
           ? normalized.message
           : 'Internal server error',
-        ...(normalized.error ? { error: normalized.error } : {}),
-        errorId,
+        ...(this.exposeInternalErrors && normalized.error
+          ? { error: normalized.error }
+          : {}),
+        error_id: errorId,
+        timestamp,
       } satisfies ErrorResponse);
       return;
     }
@@ -70,7 +80,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    response.status(status).send(normalized);
+    response.status(status).send({
+      status_code: status,
+      message: normalized.message,
+      ...(normalized.error ? { error: normalized.error } : {}),
+      timestamp,
+    } satisfies ErrorResponse);
   }
 
   private shouldSuppressErrorLog(exception: unknown): boolean {
@@ -92,28 +107,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     );
   }
 
-  private normalizeException(
-    exception: unknown,
-    status: number,
-  ): ErrorResponse {
+  private normalizeException(exception: unknown): NormalizedException {
     if (!(exception instanceof HttpException)) {
       return {
-        statusCode: status,
         message: exception instanceof Error ? exception.message : 'Unknown error',
       };
     }
 
     const exceptionResponse = exception.getResponse();
     if (typeof exceptionResponse === 'string') {
-      return {
-        statusCode: status,
-        message: exceptionResponse,
-      };
+      return { message: exceptionResponse };
+    }
+
+    if (
+      typeof exceptionResponse !== 'object' ||
+      exceptionResponse === null ||
+      Array.isArray(exceptionResponse)
+    ) {
+      return { message: exception.message };
     }
 
     const payload = exceptionResponse as Record<string, unknown>;
     return {
-      statusCode: status,
       message:
         typeof payload.message === 'string' || Array.isArray(payload.message)
           ? (payload.message as string | string[])
