@@ -1,6 +1,15 @@
 type Environment = Record<string, unknown>;
 
 const APP_ENVIRONMENTS = new Set(['development', 'test', 'production']);
+const LOG_LEVELS = new Set([
+  'trace',
+  'debug',
+  'info',
+  'warn',
+  'error',
+  'fatal',
+  'silent',
+]);
 
 const hasValue = (value: unknown): boolean =>
   typeof value === 'string' && value.trim().length > 0;
@@ -54,6 +63,15 @@ export function validateEnvironment(config: Environment): Environment {
     );
   }
 
+  const logLevel = String(
+    config.LOG_LEVEL || (appEnv === 'production' ? 'info' : 'debug'),
+  )
+    .trim()
+    .toLowerCase();
+  if (!LOG_LEVELS.has(logLevel)) {
+    throw new Error(`Invalid LOG_LEVEL value: ${String(config.LOG_LEVEL)}`);
+  }
+
   const corsOrigins = String(config.CORS_ORIGIN || '')
     .split(',')
     .map((origin) => origin.trim())
@@ -72,11 +90,24 @@ export function validateEnvironment(config: Environment): Environment {
     );
   }
 
+  const redisFamily = parseInteger(config.REDIS_FAMILY, 0, 'REDIS_FAMILY', 0);
+  if (![0, 4, 6].includes(redisFamily)) {
+    throw new Error(`Invalid REDIS_FAMILY value: ${String(config.REDIS_FAMILY)}`);
+  }
+
   return {
     ...config,
     APP_ENV: appEnv,
+    LOG_LEVEL: logLevel,
     PORT: parsePort(config.PORT, 8000),
     REDIS_PORT: parsePort(config.REDIS_PORT, 6379),
+    REDIS_DATABASE: parseInteger(
+      config.REDIS_DATABASE,
+      0,
+      'REDIS_DATABASE',
+      0,
+    ),
+    REDIS_FAMILY: redisFamily,
     RATE_LIMIT_MAX: parseInteger(
       config.RATE_LIMIT_MAX,
       appEnv === 'production' ? 60 : 600,
