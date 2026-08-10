@@ -54,6 +54,16 @@ export function validateEnvironment(config: Environment): Environment {
     );
   }
 
+  const corsOrigins = String(config.CORS_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (appEnv === 'production' && corsOrigins.includes('*')) {
+    throw new Error(
+      'CORS_ORIGIN cannot contain * in production while credentialed CORS is enabled',
+    );
+  }
+
   const hasRedisUrl = hasValue(config.REDIS_URL);
   const hasRedisHost = hasValue(config.REDIS_HOST);
   if (!hasRedisUrl && !hasRedisHost) {
