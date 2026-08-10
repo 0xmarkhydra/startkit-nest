@@ -216,6 +216,11 @@ export function validateEnvironment(config: Environment): Environment {
       10,
       'WORKER_CONCURRENCY',
     ),
+    WORKER_STARTUP_TIMEOUT_MS: parseInteger(
+      config.WORKER_STARTUP_TIMEOUT_MS,
+      10000,
+      'WORKER_STARTUP_TIMEOUT_MS',
+    ),
     HTTP_BODY_LIMIT_BYTES: parseInteger(
       config.HTTP_BODY_LIMIT_BYTES,
       1048576,
