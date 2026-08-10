@@ -142,12 +142,19 @@ docker exec startkit-api-1 node -e "fetch('http://127.0.0.1:8000/metrics').then(
 docker exec startkit-api-1 node -e "fetch('http://127.0.0.1:8000/metrics',{headers:{authorization:'Bearer ${internal_token}'}}).then(async r=>{if(!r.ok)process.exit(1);const body=await r.text();if(!body.includes('startkit_process_uptime_seconds'))process.exit(1)}).catch(()=>process.exit(1))"
 docker exec startkit-api-1 node -e "fetch('http://127.0.0.1:8000/health/dependencies',{headers:{authorization:'Bearer ${internal_token}'}}).then(async r=>{if(!r.ok)process.exit(1);const body=await r.json();if(body.data.database!=='connected'||body.data.redis!=='connected')process.exit(1)}).catch(()=>process.exit(1))"
 
+# Poison the worker with invalid API/database-only settings. The worker must ignore
+# them because its bootstrap role only validates shared Redis/logging + worker config.
 docker run -d \
   --name startkit-worker \
   --network "$network" \
   --add-host host.docker.internal:host-gateway \
   -e APP_ENV=production \
   -e REDIS_URL=redis://host.docker.internal:6379/0 \
+  -e CORS_ORIGIN='*' \
+  -e TRUST_PROXY=true \
+  -e INTERNAL_ENDPOINT_TOKEN=short \
+  -e DB_SYNC=1 \
+  -e RATE_LIMIT_RETRY_COOLDOWN_MS=0 \
   -e WORKER_CONCURRENCY=1 \
   -e WORKER_STARTUP_TIMEOUT_MS=10000 \
   "$image" node dist/worker.js >/dev/null
