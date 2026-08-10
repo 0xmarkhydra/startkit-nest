@@ -7,13 +7,13 @@ import {
 } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
-import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { parsePositiveIntegerEnv, parseTrustProxy } from './core/http-options';
 
 process.env.STARTKIT_PROCESS_ROLE = 'api';
 
 async function bootstrap(): Promise<void> {
+  const { AppModule } = await import('./app.module');
   const adapter = new FastifyAdapter({
     trustProxy: parseTrustProxy(),
     bodyLimit: parsePositiveIntegerEnv(
