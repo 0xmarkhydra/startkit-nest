@@ -20,6 +20,12 @@
     "test": "jest",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "test:load": "node test/load-smoke.mjs",
+    "migration:show": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:show",
+    "migration:run": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:run",
+    "migration:revert": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:revert",
+    "migration:generate": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:generate",
+    "migration:create": "typeorm migration:create",
     "check": "pnpm run lint && pnpm run build && pnpm run test"
   },
   "dependencies": {
