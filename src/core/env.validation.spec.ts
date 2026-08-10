@@ -7,8 +7,9 @@ describe('validateEnvironment', () => {
     REDIS_URL: 'redis://localhost:6379/0',
   };
 
-  it('accepts a valid environment and applies scaling defaults', () => {
+  it('accepts a valid API environment and applies API defaults', () => {
     expect(validateEnvironment(validEnvironment)).toMatchObject({
+      STARTKIT_PROCESS_ROLE: 'api',
       APP_ENV: 'test',
       LOG_LEVEL: 'debug',
       PORT: 8000,
@@ -22,14 +23,43 @@ describe('validateEnvironment', () => {
       RATE_LIMIT_TTL_SECONDS: 60,
       RATE_LIMIT_FAIL_OPEN: false,
       RATE_LIMIT_RETRY_COOLDOWN_MS: 1000,
-      WORKER_STARTUP_TIMEOUT_MS: 10000,
       HTTP_BODY_LIMIT_BYTES: 1048576,
       DEPENDENCY_CHECK_TIMEOUT_MS: 2000,
     });
   });
 
+  it('validates worker settings without coupling worker startup to API settings', () => {
+    expect(
+      validateEnvironment({
+        ...validEnvironment,
+        STARTKIT_PROCESS_ROLE: 'worker',
+        APP_ENV: 'production',
+        CORS_ORIGIN: '*',
+        TRUST_PROXY: 'true',
+        INTERNAL_ENDPOINT_TOKEN: 'short',
+        RATE_LIMIT_RETRY_COOLDOWN_MS: '0',
+        WORKER_CONCURRENCY: '4',
+        WORKER_STARTUP_TIMEOUT_MS: '2500',
+      }),
+    ).toMatchObject({
+      STARTKIT_PROCESS_ROLE: 'worker',
+      APP_ENV: 'production',
+      WORKER_CONCURRENCY: 4,
+      WORKER_STARTUP_TIMEOUT_MS: 2500,
+    });
+  });
+
   it('does not require database configuration from shared core validation', () => {
     expect(() => validateEnvironment(validEnvironment)).not.toThrow();
+  });
+
+  it('rejects an unknown process role', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        STARTKIT_PROCESS_ROLE: 'scheduler',
+      }),
+    ).toThrow('Invalid STARTKIT_PROCESS_ROLE value');
   });
 
   it('rejects an unknown application environment', () => {
@@ -50,7 +80,7 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid LOG_LEVEL value');
   });
 
-  it('rejects credentialed wildcard CORS in production', () => {
+  it('rejects credentialed wildcard CORS in production API mode', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
@@ -107,7 +137,7 @@ describe('validateEnvironment', () => {
     });
   });
 
-  it('rejects trusting every proxy in production', () => {
+  it('rejects trusting every proxy in production API mode', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
@@ -139,10 +169,17 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid TRUST_PROXY value');
   });
 
-  it('rejects a missing Redis configuration', () => {
+  it('rejects a missing Redis configuration for either process role', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
+        REDIS_URL: '',
+      }),
+    ).toThrow('Configure REDIS_URL');
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        STARTKIT_PROCESS_ROLE: 'worker',
         REDIS_URL: '',
       }),
     ).toThrow('Configure REDIS_URL');
@@ -166,7 +203,7 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid REDIS_FAMILY value');
   });
 
-  it('rejects non-positive Redis timeouts', () => {
+  it('rejects non-positive API Redis timeouts', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
@@ -175,7 +212,7 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid REDIS_COMMAND_TIMEOUT_MS value');
   });
 
-  it('rejects an invalid port', () => {
+  it('rejects an invalid API port', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
@@ -184,7 +221,7 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid port value');
   });
 
-  it('parses rate limiter fail-open flags', () => {
+  it('parses API rate limiter fail-open flags', () => {
     expect(
       validateEnvironment({
         ...validEnvironment,
@@ -193,7 +230,7 @@ describe('validateEnvironment', () => {
     ).toMatchObject({ RATE_LIMIT_FAIL_OPEN: true });
   });
 
-  it('rejects a non-positive rate limiter retry cooldown', () => {
+  it('rejects a non-positive API rate limiter retry cooldown', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
@@ -202,12 +239,20 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid RATE_LIMIT_RETRY_COOLDOWN_MS value');
   });
 
-  it('rejects a non-positive worker startup timeout', () => {
+  it('rejects non-positive worker settings in worker mode', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
+        STARTKIT_PROCESS_ROLE: 'worker',
         WORKER_STARTUP_TIMEOUT_MS: '0',
       }),
     ).toThrow('Invalid WORKER_STARTUP_TIMEOUT_MS value');
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        STARTKIT_PROCESS_ROLE: 'worker',
+        WORKER_CONCURRENCY: '0',
+      }),
+    ).toThrow('Invalid WORKER_CONCURRENCY value');
   });
 });
