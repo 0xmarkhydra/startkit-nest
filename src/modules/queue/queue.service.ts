@@ -1,7 +1,7 @@
 import { QUEUE_NAME, QUEUE_PROCESSOR } from '@/shared/constants/queue';
 import { InjectQueue } from '@nestjs/bull';
 import { Injectable } from '@nestjs/common';
-import { Queue } from 'bull';
+import { Job, Queue } from 'bull';
 
 export type SampleJobPayload = {
   message: string;
@@ -14,7 +14,7 @@ export class QueueService {
     private readonly sampleQueue: Queue<SampleJobPayload>,
   ) {}
 
-  async addSampleJob(payload: SampleJobPayload) {
+  async addSampleJob(payload: SampleJobPayload): Promise<Job<SampleJobPayload>> {
     return this.sampleQueue.add(QUEUE_PROCESSOR.SAMPLE.HANDLE, payload, {
       attempts: 3,
       backoff: {
