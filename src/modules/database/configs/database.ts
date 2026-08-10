@@ -5,6 +5,14 @@ import { join } from 'path';
 const hasValue = (value: string | undefined): boolean =>
   Boolean(value && value.trim().length > 0);
 
+const requiredEnv = (name: string): string => {
+  const value = process.env[name];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required database environment variable: ${name}`);
+  }
+  return value;
+};
+
 const parseBoolean = (
   value: string | undefined,
   name: string,
@@ -72,11 +80,11 @@ export const createDatabaseOptions = (): TypeOrmModuleOptions => {
   const connection = databaseUrl
     ? { url: databaseUrl }
     : {
-        host: process.env.DB_HOST!.trim(),
+        host: requiredEnv('DB_HOST').trim(),
         port: parsePort(process.env.DB_PORT, 5432),
-        username: process.env.DB_USERNAME!.trim(),
-        password: process.env.DB_PASSWORD!,
-        database: process.env.DB_DATABASE!.trim(),
+        username: requiredEnv('DB_USERNAME').trim(),
+        password: requiredEnv('DB_PASSWORD'),
+        database: requiredEnv('DB_DATABASE').trim(),
       };
   const poolSize = parsePositiveInteger(
     process.env.DB_POOL_MAX,
