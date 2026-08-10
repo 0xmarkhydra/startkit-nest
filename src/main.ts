@@ -11,7 +11,7 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { parsePositiveIntegerEnv, parseTrustProxy } from './core/http-options';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const adapter = new FastifyAdapter({
     trustProxy: parseTrustProxy(),
     bodyLimit: parsePositiveIntegerEnv(
@@ -79,7 +79,9 @@ async function bootstrap() {
   Logger.log(`API is running at http://localhost:${port}`);
 }
 
-bootstrap().catch((error) => {
-  Logger.error('Failed to start API', error?.stack || error);
+bootstrap().catch((error: unknown) => {
+  const details =
+    error instanceof Error ? error.stack || error.message : String(error);
+  Logger.error('Failed to start API', details);
   process.exit(1);
 });
