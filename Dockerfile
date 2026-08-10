@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 
 WORKDIR /app
 RUN npm install --global pnpm@9
@@ -10,7 +10,7 @@ COPY . .
 RUN pnpm run build
 RUN pnpm prune --prod
 
-FROM node:20-alpine AS runtime
+FROM node:26-alpine AS runtime
 
 ENV NODE_ENV=production
 ENV APP_ENV=production
