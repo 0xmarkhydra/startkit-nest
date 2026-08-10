@@ -1,7 +1,6 @@
 import { Global, Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import { configRedis } from '@/redis/configs/redis';
 import { validateEnvironment } from './env.validation';
 
 @Global()
@@ -12,7 +11,6 @@ import { validateEnvironment } from './env.validation';
       cache: true,
       expandVariables: true,
       validate: validateEnvironment,
-      load: [configRedis],
     }),
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
