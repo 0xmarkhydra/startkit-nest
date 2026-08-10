@@ -11,9 +11,7 @@ import { QueueService } from './queue.service';
       useFactory: (configService: ConfigService) => {
         const url = configService.get<string>('redis.url');
         if (url) {
-          return {
-            redis: url,
-          };
+          return { redis: url };
         }
 
         const family = configService.get<number>('redis.family');
@@ -25,8 +23,6 @@ import { QueueService } from './queue.service';
             username: configService.get<string>('redis.username') || undefined,
             password: configService.get<string>('redis.password') || undefined,
             ...(family === 4 || family === 6 ? { family } : {}),
-            retryStrategy: (times: number) => Math.min(times * 100, 3000),
-            enableOfflineQueue: true,
           },
         };
       },
