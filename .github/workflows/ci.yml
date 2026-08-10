@@ -99,40 +99,60 @@ jobs:
           set -euo pipefail
           docker network create startkit-ci
 
-          if docker run --rm \
+          assert_startup_failure() {
+            name="$1"
+            expected_message="$2"
+            shift 2
+
+            docker run -d --name "$name" "$@" >/dev/null
+            sleep 2
+
+            if [ "$(docker inspect -f '{{.State.Running}}' "$name")" = "true" ]; then
+              docker logs "$name"
+              echo "$name unexpectedly remained running"
+              return 1
+            fi
+
+            if ! docker logs "$name" 2>&1 | grep -Fq "$expected_message"; then
+              docker logs "$name"
+              echo "$name failed, but not for the expected guardrail: $expected_message"
+              return 1
+            fi
+
+            docker rm "$name" >/dev/null
+          }
+
+          assert_startup_failure \
+            startkit-invalid-env \
+            "Invalid APP_ENV value" \
             --network startkit-ci \
             --add-host host.docker.internal:host-gateway \
             -e APP_ENV=prodution \
             -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
-            startkit-nest:ci; then
-            echo "Invalid APP_ENV unexpectedly booted"
-            exit 1
-          fi
+            startkit-nest:ci
 
-          if docker run --rm \
+          assert_startup_failure \
+            startkit-invalid-cors \
+            "CORS_ORIGIN cannot contain * in production" \
             --network startkit-ci \
             --add-host host.docker.internal:host-gateway \
             -e APP_ENV=production \
             -e CORS_ORIGIN='*' \
             -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
-            startkit-nest:ci; then
-            echo "Production wildcard CORS unexpectedly booted"
-            exit 1
-          fi
+            startkit-nest:ci
 
-          if docker run --rm \
+          assert_startup_failure \
+            startkit-invalid-dbsync \
+            "DB_SYNC must be disabled in production" \
             --network startkit-ci \
             --add-host host.docker.internal:host-gateway \
             -e APP_ENV=production \
             -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e DB_SYNC=1 \
-            startkit-nest:ci; then
-            echo "Production DB_SYNC unexpectedly booted"
-            exit 1
-          fi
+            startkit-nest:ci
 
           docker run --rm \
             --network startkit-ci \
@@ -288,5 +308,15 @@ jobs:
       - name: Stop smoke-test containers
         if: always()
         run: |
-          docker rm -f startkit-gateway startkit-api-fail-open startkit-worker startkit-api-1 startkit-api-2 startkit-api-3 2>/dev/null || true
+          docker rm -f \
+            startkit-invalid-env \
+            startkit-invalid-cors \
+            startkit-invalid-dbsync \
+            startkit-gateway \
+            startkit-api-fail-open \
+            startkit-worker \
+            startkit-api-1 \
+            startkit-api-2 \
+            startkit-api-3 \
+            2>/dev/null || true
           docker network rm startkit-ci 2>/dev/null || true
