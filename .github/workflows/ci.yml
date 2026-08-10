@@ -65,6 +65,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm run lint
+
       - name: Build
         run: pnpm run build
 
@@ -88,7 +91,7 @@ jobs:
       - name: Build Docker image
         run: docker build --tag startkit-nest:ci .
 
-      - name: Horizontal scaling smoke test
+      - name: Horizontal scaling and failure-policy smoke test
         run: |
           set -euo pipefail
           docker network create startkit-ci
@@ -106,7 +109,7 @@ jobs:
               -e TRUST_PROXY=1 \
               -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
               -e REDIS_URL=redis://host.docker.internal:6379/0 \
-              -e DB_SYNC=1 \
+              -e DB_SYNC=0 \
               -e DB_POOL_MAX=3 \
               -e RATE_LIMIT_MAX=3 \
               -e RATE_LIMIT_TTL_SECONDS=60 \
@@ -124,6 +127,47 @@ jobs:
               fi
               sleep 1
             done
+          done
+
+          docker run -d \
+            --name startkit-worker \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=production \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            -e WORKER_CONCURRENCY=1 \
+            startkit-nest:ci node dist/worker.js
+
+          sleep 2
+          if [ "$(docker inspect -f '{{.State.Running}}' startkit-worker)" != "true" ]; then
+            docker logs startkit-worker
+            echo "Worker failed to boot without database configuration"
+            exit 1
+          fi
+
+          docker run -d \
+            --name startkit-api-fail-open \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=production \
+            -e PORT=8000 \
+            -e INSTANCE_ID=api-fail-open \
+            -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
+            -e REDIS_URL=redis://host.docker.internal:6399/0 \
+            -e RATE_LIMIT_FAIL_OPEN=1 \
+            -e DEPENDENCY_CHECK_TIMEOUT_MS=500 \
+            startkit-nest:ci
+
+          for attempt in $(seq 1 30); do
+            if docker exec startkit-api-fail-open node -e "fetch('http://127.0.0.1:8000/health/ready').then(async r=>{if(!r.ok)process.exit(1);const b=await r.json();if(b.data.redis!=='degraded')process.exit(1)}).catch(()=>process.exit(1))"; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs startkit-api-fail-open
+              echo "Fail-open readiness did not tolerate Redis outage"
+              exit 1
+            fi
+            sleep 1
           done
 
           docker run -d \
@@ -208,8 +252,8 @@ jobs:
           });
           NODE
 
-      - name: Stop horizontal scaling containers
+      - name: Stop smoke-test containers
         if: always()
         run: |
-          docker rm -f startkit-gateway startkit-api-1 startkit-api-2 startkit-api-3 2>/dev/null || true
+          docker rm -f startkit-gateway startkit-api-fail-open startkit-worker startkit-api-1 startkit-api-2 startkit-api-3 2>/dev/null || true
           docker network rm startkit-ci 2>/dev/null || true
