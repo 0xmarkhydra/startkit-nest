@@ -99,6 +99,29 @@ jobs:
           set -euo pipefail
           docker network create startkit-ci
 
+          if docker run --rm \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=prodution \
+            -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            startkit-nest:ci; then
+            echo "Invalid APP_ENV unexpectedly booted"
+            exit 1
+          fi
+
+          if docker run --rm \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=production \
+            -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            -e DB_SYNC=1 \
+            startkit-nest:ci; then
+            echo "Production DB_SYNC unexpectedly booted"
+            exit 1
+          fi
+
           for replica in 1 2 3; do
             docker run -d \
               --name "startkit-api-${replica}" \
@@ -191,24 +214,12 @@ jobs:
             sleep 1
           done
 
-          node <<'NODE'
-          (async () => {
-            const ids = new Set();
-            for (let i = 0; i < 30; i += 1) {
-              const response = await fetch('http://127.0.0.1:18000/health');
-              if (!response.ok) throw new Error(`health returned ${response.status}`);
-              const body = await response.json();
-              ids.add(body.data.instanceId);
-            }
-            if (ids.size < 2) {
-              throw new Error(`gateway did not distribute requests: ${[...ids].join(',')}`);
-            }
-            console.log(`gateway reached replicas: ${[...ids].join(',')}`);
-          })().catch((error) => {
-            console.error(error);
-            process.exit(1);
-          });
-          NODE
+          LOAD_URL=http://127.0.0.1:18000/health \
+          LOAD_REQUESTS=200 \
+          LOAD_CONCURRENCY=20 \
+          LOAD_P95_MAX_MS=1000 \
+          LOAD_MIN_INSTANCES=2 \
+          pnpm run test:load
 
           node <<'NODE'
           const Redis = require('ioredis');
