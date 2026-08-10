@@ -12,8 +12,11 @@ describe('validateEnvironment', () => {
       APP_ENV: 'test',
       LOG_LEVEL: 'debug',
       PORT: 8000,
+      TRUST_PROXY: '0',
       REDIS_DATABASE: 0,
       REDIS_FAMILY: 0,
+      REDIS_CONNECT_TIMEOUT_MS: 5000,
+      REDIS_COMMAND_TIMEOUT_MS: 2000,
       RATE_LIMIT_MAX: 600,
       RATE_LIMIT_TTL_SECONDS: 60,
       RATE_LIMIT_FAIL_OPEN: false,
@@ -64,6 +67,47 @@ describe('validateEnvironment', () => {
     ).not.toThrow();
   });
 
+  it('rejects CORS entries that are not exact origins', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        CORS_ORIGIN: 'https://app.example.com/path',
+      }),
+    ).toThrow('Use an exact http(s) origin without a path');
+  });
+
+  it('rejects trusting every proxy in production', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        APP_ENV: 'production',
+        TRUST_PROXY: 'true',
+      }),
+    ).toThrow('TRUST_PROXY=true is not allowed in production');
+  });
+
+  it('accepts bounded proxy hops and explicit CIDRs', () => {
+    expect(
+      validateEnvironment({ ...validEnvironment, TRUST_PROXY: '2' }),
+    ).toMatchObject({ TRUST_PROXY: '2' });
+    expect(
+      validateEnvironment({
+        ...validEnvironment,
+        APP_ENV: 'production',
+        TRUST_PROXY: '10.0.0.0/8',
+      }),
+    ).toMatchObject({ TRUST_PROXY: '10.0.0.0/8' });
+  });
+
+  it('rejects malformed proxy trust values', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        TRUST_PROXY: 'flase',
+      }),
+    ).toThrow('Invalid TRUST_PROXY value');
+  });
+
   it('rejects a missing Redis configuration', () => {
     expect(() =>
       validateEnvironment({
@@ -89,6 +133,15 @@ describe('validateEnvironment', () => {
         REDIS_FAMILY: '5',
       }),
     ).toThrow('Invalid REDIS_FAMILY value');
+  });
+
+  it('rejects non-positive Redis timeouts', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        REDIS_COMMAND_TIMEOUT_MS: '0',
+      }),
+    ).toThrow('Invalid REDIS_COMMAND_TIMEOUT_MS value');
   });
 
   it('rejects an invalid port', () => {
