@@ -29,7 +29,7 @@
     "check": "pnpm run lint && pnpm run build && pnpm run test"
   },
   "dependencies": {
-    "@nestjs/bull": "^10.0.1",
+    "@nestjs/bull": "^11.0.5",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.0.0",
     "@nestjs/core": "^10.0.0",
