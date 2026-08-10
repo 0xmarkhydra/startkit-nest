@@ -13,6 +13,7 @@ describe('validateEnvironment', () => {
       LOG_LEVEL: 'debug',
       PORT: 8000,
       TRUST_PROXY: '0',
+      INTERNAL_ENDPOINT_TOKEN: '',
       REDIS_DATABASE: 0,
       REDIS_FAMILY: 0,
       REDIS_CONNECT_TIMEOUT_MS: 5000,
@@ -74,6 +75,35 @@ describe('validateEnvironment', () => {
         CORS_ORIGIN: 'https://app.example.com/path',
       }),
     ).toThrow('Use an exact http(s) origin without a path');
+  });
+
+  it('rejects a weak configured production internal token', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        APP_ENV: 'production',
+        INTERNAL_ENDPOINT_TOKEN: 'too-short',
+      }),
+    ).toThrow('INTERNAL_ENDPOINT_TOKEN must be at least 32 characters');
+  });
+
+  it('accepts an empty or strong production internal token', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        APP_ENV: 'production',
+        INTERNAL_ENDPOINT_TOKEN: '',
+      }),
+    ).not.toThrow();
+    expect(
+      validateEnvironment({
+        ...validEnvironment,
+        APP_ENV: 'production',
+        INTERNAL_ENDPOINT_TOKEN: '0123456789abcdef0123456789abcdef',
+      }),
+    ).toMatchObject({
+      INTERNAL_ENDPOINT_TOKEN: '0123456789abcdef0123456789abcdef',
+    });
   });
 
   it('rejects trusting every proxy in production', () => {
