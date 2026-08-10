@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
-import { RedisService } from '@/redis/redis.service';
+import { RateLimitRecord, RedisService } from '@/redis/redis.service';
 import { SKIP_RATE_LIMIT_KEY } from '@/shared/decorators/skip-rate-limit.decorator';
 
 interface HttpRequestLike {
@@ -74,7 +74,7 @@ export class DistributedRateLimitGuard implements CanActivate {
       .digest('hex');
     const key = `startkit:rate-limit:${digest}`;
 
-    let record;
+    let record: RateLimitRecord;
     try {
       record = await this.redisService.consumeSlidingWindow(
         key,
