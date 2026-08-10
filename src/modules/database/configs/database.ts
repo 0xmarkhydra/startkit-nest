@@ -100,6 +100,16 @@ export const createDatabaseOptions = (): TypeOrmModuleOptions => {
     migrations: [join(__dirname, '../migrations/*{.js,.ts}')],
     autoLoadEntities: true,
     logging,
+    retryAttempts: parsePositiveInteger(
+      process.env.DB_RETRY_ATTEMPTS,
+      3,
+      'DB_RETRY_ATTEMPTS',
+    ),
+    retryDelay: parsePositiveInteger(
+      process.env.DB_RETRY_DELAY_MS,
+      1000,
+      'DB_RETRY_DELAY_MS',
+    ),
     poolSize,
     extra: {
       max: poolSize,
