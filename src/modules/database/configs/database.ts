@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { join } from 'path';
 
 const hasValue = (value: string | undefined): boolean =>
   Boolean(value && value.trim().length > 0);
@@ -44,73 +45,74 @@ const parsePort = (value: string | undefined, fallback: number): number => {
   return port;
 };
 
-export const configDb = registerAs(
-  'db',
-  (): TypeOrmModuleOptions => {
-    const databaseUrl = process.env.DATABASE_URL?.trim();
-    const hasDatabaseFields =
-      hasValue(process.env.DB_HOST) &&
-      hasValue(process.env.DB_USERNAME) &&
-      hasValue(process.env.DB_PASSWORD) &&
-      hasValue(process.env.DB_DATABASE);
+export const createDatabaseOptions = (): TypeOrmModuleOptions => {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const hasDatabaseFields =
+    hasValue(process.env.DB_HOST) &&
+    hasValue(process.env.DB_USERNAME) &&
+    hasValue(process.env.DB_PASSWORD) &&
+    hasValue(process.env.DB_DATABASE);
 
-    if (!databaseUrl && !hasDatabaseFields) {
-      throw new Error(
-        'Configure DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD and DB_DATABASE',
-      );
-    }
-
-    const synchronize = parseBoolean(process.env.DB_SYNC, 'DB_SYNC');
-    const logging = parseBoolean(process.env.DB_DEBUG, 'DB_DEBUG');
-    const appEnv = (process.env.APP_ENV || 'development').trim().toLowerCase();
-    if (appEnv === 'production' && synchronize) {
-      throw new Error(
-        'DB_SYNC must be disabled in production. Use database migrations instead',
-      );
-    }
-
-    const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
-    const connection = databaseUrl
-      ? { url: databaseUrl }
-      : {
-          host: process.env.DB_HOST!.trim(),
-          port: parsePort(process.env.DB_PORT, 5432),
-          username: process.env.DB_USERNAME!.trim(),
-          password: process.env.DB_PASSWORD!,
-          database: process.env.DB_DATABASE!.trim(),
-        };
-    const poolSize = parsePositiveInteger(
-      process.env.DB_POOL_MAX,
-      10,
-      'DB_POOL_MAX',
+  if (!databaseUrl && !hasDatabaseFields) {
+    throw new Error(
+      'Configure DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD and DB_DATABASE',
     );
+  }
 
-    return {
-      type: 'postgres',
-      ...connection,
-      synchronize,
-      autoLoadEntities: true,
-      logging,
-      poolSize,
-      extra: {
-        max: poolSize,
-        connectionTimeoutMillis: parsePositiveInteger(
-          process.env.DB_CONNECTION_TIMEOUT_MS,
-          5000,
-          'DB_CONNECTION_TIMEOUT_MS',
-        ),
-        idleTimeoutMillis: parsePositiveInteger(
-          process.env.DB_IDLE_TIMEOUT_MS,
-          30000,
-          'DB_IDLE_TIMEOUT_MS',
-        ),
-        statement_timeout: parsePositiveInteger(
-          process.env.DB_STATEMENT_TIMEOUT_MS,
-          30000,
-          'DB_STATEMENT_TIMEOUT_MS',
-        ),
-        application_name: `startkit:${instanceId}`,
-      },
-    };
-  },
-);
+  const synchronize = parseBoolean(process.env.DB_SYNC, 'DB_SYNC');
+  const logging = parseBoolean(process.env.DB_DEBUG, 'DB_DEBUG');
+  const appEnv = (process.env.APP_ENV || 'development').trim().toLowerCase();
+  if (appEnv === 'production' && synchronize) {
+    throw new Error(
+      'DB_SYNC must be disabled in production. Use database migrations instead',
+    );
+  }
+
+  const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
+  const connection = databaseUrl
+    ? { url: databaseUrl }
+    : {
+        host: process.env.DB_HOST!.trim(),
+        port: parsePort(process.env.DB_PORT, 5432),
+        username: process.env.DB_USERNAME!.trim(),
+        password: process.env.DB_PASSWORD!,
+        database: process.env.DB_DATABASE!.trim(),
+      };
+  const poolSize = parsePositiveInteger(
+    process.env.DB_POOL_MAX,
+    10,
+    'DB_POOL_MAX',
+  );
+
+  return {
+    type: 'postgres',
+    ...connection,
+    synchronize,
+    migrationsRun: false,
+    migrations: [join(__dirname, '../migrations/*{.js,.ts}')],
+    autoLoadEntities: true,
+    logging,
+    poolSize,
+    extra: {
+      max: poolSize,
+      connectionTimeoutMillis: parsePositiveInteger(
+        process.env.DB_CONNECTION_TIMEOUT_MS,
+        5000,
+        'DB_CONNECTION_TIMEOUT_MS',
+      ),
+      idleTimeoutMillis: parsePositiveInteger(
+        process.env.DB_IDLE_TIMEOUT_MS,
+        30000,
+        'DB_IDLE_TIMEOUT_MS',
+      ),
+      statement_timeout: parsePositiveInteger(
+        process.env.DB_STATEMENT_TIMEOUT_MS,
+        30000,
+        'DB_STATEMENT_TIMEOUT_MS',
+      ),
+      application_name: `startkit:${instanceId}`,
+    },
+  };
+};
+
+export const configDb = registerAs('db', createDatabaseOptions);
