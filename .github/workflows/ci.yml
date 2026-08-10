@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -13,6 +16,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -62,7 +66,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.6.0
           cache: pnpm
 
       - name: Install dependencies
@@ -144,6 +148,17 @@ jobs:
             startkit-nest:ci
 
           assert_startup_failure \
+            startkit-invalid-proxy \
+            "TRUST_PROXY=true is not allowed in production" \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=production \
+            -e TRUST_PROXY=true \
+            -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            startkit-nest:ci
+
+          assert_startup_failure \
             startkit-invalid-dbsync \
             "DB_SYNC must be disabled in production" \
             --network startkit-ci \
@@ -171,6 +186,7 @@ jobs:
               -e PORT=8000 \
               -e CORS_ORIGIN=http://localhost:3000 \
               -e INSTANCE_ID="api-${replica}" \
+              -e INTERNAL_ENDPOINT_TOKEN=startkit-ci-internal-token \
               -e TRUST_PROXY=1 \
               -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
               -e REDIS_URL=redis://host.docker.internal:6379/0 \
@@ -193,6 +209,10 @@ jobs:
               sleep 1
             done
           done
+
+          docker exec startkit-api-1 node -e "fetch('http://127.0.0.1:8000/metrics').then(r=>{if(r.status!==401)process.exit(1)}).catch(()=>process.exit(1))"
+          docker exec startkit-api-1 node -e "fetch('http://127.0.0.1:8000/metrics',{headers:{authorization:'Bearer startkit-ci-internal-token'}}).then(async r=>{if(!r.ok)process.exit(1);const body=await r.text();if(!body.includes('startkit_process_uptime_seconds'))process.exit(1)}).catch(()=>process.exit(1))"
+          docker exec startkit-api-1 node -e "fetch('http://127.0.0.1:8000/health/dependencies',{headers:{authorization:'Bearer startkit-ci-internal-token'}}).then(async r=>{if(!r.ok)process.exit(1);const body=await r.json();if(body.data.database!=='connected'||body.data.redis!=='connected')process.exit(1)}).catch(()=>process.exit(1))"
 
           docker run -d \
             --name startkit-worker \
@@ -219,6 +239,8 @@ jobs:
             -e INSTANCE_ID=api-fail-open \
             -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
             -e REDIS_URL=redis://host.docker.internal:6399/0 \
+            -e REDIS_CONNECT_TIMEOUT_MS=500 \
+            -e REDIS_COMMAND_TIMEOUT_MS=500 \
             -e RATE_LIMIT_FAIL_OPEN=1 \
             -e DEPENDENCY_CHECK_TIMEOUT_MS=500 \
             startkit-nest:ci
@@ -311,6 +333,7 @@ jobs:
           docker rm -f \
             startkit-invalid-env \
             startkit-invalid-cors \
+            startkit-invalid-proxy \
             startkit-invalid-dbsync \
             startkit-gateway \
             startkit-api-fail-open \
