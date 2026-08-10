@@ -11,6 +11,8 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { parsePositiveIntegerEnv, parseTrustProxy } from './core/http-options';
 
+process.env.STARTKIT_PROCESS_ROLE = 'api';
+
 async function bootstrap(): Promise<void> {
   const adapter = new FastifyAdapter({
     trustProxy: parseTrustProxy(),
