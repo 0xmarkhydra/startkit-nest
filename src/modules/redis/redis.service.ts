@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis, { RedisOptions } from 'ioredis';
+import { resolveRedisConnection } from './redis-connection';
 
 export interface RateLimitRecord {
   allowed: boolean;
@@ -60,27 +61,24 @@ export class RedisService implements OnApplicationShutdown {
   private readonly connectionErrorLogIntervalMs = 30000;
 
   constructor(private readonly configService: ConfigService) {
-    const commonOptions: RedisOptions = {
+    const instanceId =
+      this.configService.get<string>('INSTANCE_ID') ||
+      process.env.HOSTNAME ||
+      'local';
+    const runtimeOptions: RedisOptions = {
       enableReadyCheck: true,
       maxRetriesPerRequest: 2,
+      connectTimeout:
+        this.configService.get<number>('REDIS_CONNECT_TIMEOUT_MS') ?? 5000,
+      commandTimeout:
+        this.configService.get<number>('REDIS_COMMAND_TIMEOUT_MS') ?? 2000,
+      connectionName: `startkit:${instanceId}:api`,
     };
-    const redisUrl = this.configService.get<string>('redis.url');
-    let client: Redis;
-
-    if (redisUrl) {
-      client = new Redis(redisUrl, commonOptions);
-    } else {
-      const family = this.configService.get<number>('redis.family');
-      client = new Redis({
-        ...commonOptions,
-        host: this.configService.getOrThrow<string>('redis.host'),
-        port: this.configService.getOrThrow<number>('redis.port'),
-        db: this.configService.get<number>('redis.database') || 0,
-        username: this.configService.get<string>('redis.username') || undefined,
-        password: this.configService.get<string>('redis.password') || undefined,
-        ...(family === 4 || family === 6 ? { family } : {}),
-      });
-    }
+    const connection = resolveRedisConnection(this.configService);
+    const client =
+      connection.mode === 'url'
+        ? new Redis(connection.url, runtimeOptions)
+        : new Redis({ ...connection.options, ...runtimeOptions });
 
     client.defineCommand('consumeSlidingWindowCommand', {
       numberOfKeys: 1,
@@ -108,11 +106,22 @@ export class RedisService implements OnApplicationShutdown {
       ttlMilliseconds,
       safeLimit,
     );
+    const allowed = Number(result[0]);
+    const totalHits = Number(result[1]);
+    const timeToExpire = Number(result[2]);
+
+    if (
+      !Number.isFinite(allowed) ||
+      !Number.isFinite(totalHits) ||
+      !Number.isFinite(timeToExpire)
+    ) {
+      throw new Error('Redis returned an invalid rate-limit response');
+    }
 
     return {
-      allowed: Number(result[0]) === 1,
-      totalHits: Number(result[1]),
-      timeToExpire: Math.max(1, Number(result[2])),
+      allowed: allowed === 1,
+      totalHits,
+      timeToExpire: Math.max(1, timeToExpire),
     };
   }
 
