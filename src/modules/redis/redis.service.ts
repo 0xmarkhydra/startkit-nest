@@ -8,6 +8,14 @@ export interface RateLimitRecord {
   timeToExpire: number;
 }
 
+type RedisWithRateLimitCommand = Redis & {
+  consumeSlidingWindowCommand(
+    key: string,
+    ttlMilliseconds: number,
+    limit: number,
+  ): Promise<[number | string, number | string, number | string]>;
+};
+
 const SLIDING_WINDOW_SCRIPT = `
 local key = KEYS[1]
 local ttl = tonumber(ARGV[1])
@@ -46,7 +54,10 @@ return { 1, count, math.ceil(remainingMs / 1000) }
 @Injectable()
 export class RedisService implements OnApplicationShutdown {
   private readonly logger = new Logger(RedisService.name);
-  private readonly client: Redis;
+  private readonly client: RedisWithRateLimitCommand;
+  private connectionUnavailable = false;
+  private lastConnectionErrorLogAt = 0;
+  private readonly connectionErrorLogIntervalMs = 30000;
 
   constructor(private readonly configService: ConfigService) {
     const commonOptions: RedisOptions = {
@@ -54,12 +65,13 @@ export class RedisService implements OnApplicationShutdown {
       maxRetriesPerRequest: 2,
     };
     const redisUrl = this.configService.get<string>('redis.url');
+    let client: Redis;
 
     if (redisUrl) {
-      this.client = new Redis(redisUrl, commonOptions);
+      client = new Redis(redisUrl, commonOptions);
     } else {
       const family = this.configService.get<number>('redis.family');
-      this.client = new Redis({
+      client = new Redis({
         ...commonOptions,
         host: this.configService.getOrThrow<string>('redis.host'),
         port: this.configService.getOrThrow<number>('redis.port'),
@@ -70,9 +82,14 @@ export class RedisService implements OnApplicationShutdown {
       });
     }
 
-    this.client.on('error', (error) => {
-      this.logger.error(`Redis connection error: ${error.message}`);
+    client.defineCommand('consumeSlidingWindowCommand', {
+      numberOfKeys: 1,
+      lua: SLIDING_WINDOW_SCRIPT,
     });
+    this.client = client as RedisWithRateLimitCommand;
+
+    this.client.on('error', (error) => this.markConnectionUnavailable(error));
+    this.client.on('ready', () => this.markConnectionHealthy());
   }
 
   async ping(): Promise<string> {
@@ -86,13 +103,11 @@ export class RedisService implements OnApplicationShutdown {
   ): Promise<RateLimitRecord> {
     const ttlMilliseconds = Math.max(1, ttlSeconds) * 1000;
     const safeLimit = Math.max(1, Math.floor(limit));
-    const result = (await this.client.eval(
-      SLIDING_WINDOW_SCRIPT,
-      1,
+    const result = await this.client.consumeSlidingWindowCommand(
       key,
       ttlMilliseconds,
       safeLimit,
-    )) as [number, number, number];
+    );
 
     return {
       allowed: Number(result[0]) === 1,
@@ -111,5 +126,27 @@ export class RedisService implements OnApplicationShutdown {
     } catch {
       this.client.disconnect();
     }
+  }
+
+  private markConnectionUnavailable(error: Error): void {
+    const now = Date.now();
+    if (
+      !this.connectionUnavailable ||
+      now - this.lastConnectionErrorLogAt >= this.connectionErrorLogIntervalMs
+    ) {
+      this.logger.error(`Redis connection error: ${error.message}`);
+      this.lastConnectionErrorLogAt = now;
+    }
+    this.connectionUnavailable = true;
+  }
+
+  private markConnectionHealthy(): void {
+    if (!this.connectionUnavailable) {
+      return;
+    }
+
+    this.connectionUnavailable = false;
+    this.lastConnectionErrorLogAt = 0;
+    this.logger.log('Redis connection recovered');
   }
 }

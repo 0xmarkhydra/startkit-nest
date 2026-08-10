@@ -1,35 +1,118 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { join } from 'path';
 
-export const configDb = registerAs(
-  'db',
-  (): TypeOrmModuleOptions => {
-    const databaseUrl = process.env.DATABASE_URL?.trim();
-    const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
-    const connection = databaseUrl
-      ? { url: databaseUrl }
-      : {
-          host: process.env.DB_HOST || 'localhost',
-          port: Number(process.env.DB_PORT) || 5432,
-          username: process.env.DB_USERNAME || 'root',
-          password: process.env.DB_PASSWORD || 'root',
-          database: process.env.DB_DATABASE || 'postgres',
-        };
+const hasValue = (value: string | undefined): boolean =>
+  Boolean(value && value.trim().length > 0);
 
-    return {
-      type: 'postgres',
-      ...connection,
-      synchronize: Boolean(Number(process.env.DB_SYNC)) || false,
-      autoLoadEntities: true,
-      logging: Boolean(Number(process.env.DB_DEBUG)) || false,
-      poolSize: Number(process.env.DB_POOL_MAX) || 10,
-      extra: {
-        connectionTimeoutMillis:
-          Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 5000,
-        idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
-        statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS) || 30000,
-        application_name: `startkit:${instanceId}`,
-      },
-    };
-  },
-);
+const parseBoolean = (
+  value: string | undefined,
+  name: string,
+  fallback = false,
+): boolean => {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Invalid ${name} value: ${value}`);
+};
+
+const parsePositiveInteger = (
+  value: string | undefined,
+  fallback: number,
+  name: string,
+): number => {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${name} value: ${String(value)}`);
+  }
+  return parsed;
+};
+
+const parsePort = (value: string | undefined, fallback: number): number => {
+  const port = parsePositiveInteger(value, fallback, 'DB_PORT');
+  if (port > 65535) {
+    throw new Error(`Invalid DB_PORT value: ${String(value)}`);
+  }
+  return port;
+};
+
+export const createDatabaseOptions = (): TypeOrmModuleOptions => {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const hasDatabaseFields =
+    hasValue(process.env.DB_HOST) &&
+    hasValue(process.env.DB_USERNAME) &&
+    hasValue(process.env.DB_PASSWORD) &&
+    hasValue(process.env.DB_DATABASE);
+
+  if (!databaseUrl && !hasDatabaseFields) {
+    throw new Error(
+      'Configure DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD and DB_DATABASE',
+    );
+  }
+
+  const synchronize = parseBoolean(process.env.DB_SYNC, 'DB_SYNC');
+  const logging = parseBoolean(process.env.DB_DEBUG, 'DB_DEBUG');
+  const appEnv = (process.env.APP_ENV || 'development').trim().toLowerCase();
+  if (appEnv === 'production' && synchronize) {
+    throw new Error(
+      'DB_SYNC must be disabled in production. Use database migrations instead',
+    );
+  }
+
+  const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
+  const connection = databaseUrl
+    ? { url: databaseUrl }
+    : {
+        host: process.env.DB_HOST!.trim(),
+        port: parsePort(process.env.DB_PORT, 5432),
+        username: process.env.DB_USERNAME!.trim(),
+        password: process.env.DB_PASSWORD!,
+        database: process.env.DB_DATABASE!.trim(),
+      };
+  const poolSize = parsePositiveInteger(
+    process.env.DB_POOL_MAX,
+    10,
+    'DB_POOL_MAX',
+  );
+
+  return {
+    type: 'postgres',
+    ...connection,
+    synchronize,
+    migrationsRun: false,
+    migrations: [join(__dirname, '../migrations/*{.js,.ts}')],
+    autoLoadEntities: true,
+    logging,
+    poolSize,
+    extra: {
+      max: poolSize,
+      connectionTimeoutMillis: parsePositiveInteger(
+        process.env.DB_CONNECTION_TIMEOUT_MS,
+        5000,
+        'DB_CONNECTION_TIMEOUT_MS',
+      ),
+      idleTimeoutMillis: parsePositiveInteger(
+        process.env.DB_IDLE_TIMEOUT_MS,
+        30000,
+        'DB_IDLE_TIMEOUT_MS',
+      ),
+      statement_timeout: parsePositiveInteger(
+        process.env.DB_STATEMENT_TIMEOUT_MS,
+        30000,
+        'DB_STATEMENT_TIMEOUT_MS',
+      ),
+      application_name: `startkit:${instanceId}`,
+    },
+  };
+};
+
+export const configDb = registerAs('db', createDatabaseOptions);

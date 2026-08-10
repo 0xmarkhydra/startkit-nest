@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
-import { RedisService } from '@/redis/redis.service';
+import { RateLimitRecord, RedisService } from '@/redis/redis.service';
 import { SKIP_RATE_LIMIT_KEY } from '@/shared/decorators/skip-rate-limit.decorator';
 
 interface HttpRequestLike {
@@ -25,6 +25,7 @@ interface HttpReplyLike {
 export class DistributedRateLimitGuard implements CanActivate {
   private readonly logger = new Logger(DistributedRateLimitGuard.name);
   private limiterUnavailable = false;
+  private nextRecoveryProbeAt = 0;
   private lastFailureLogAt = 0;
   private readonly failureLogIntervalMs = 30000;
 
@@ -44,6 +45,23 @@ export class DistributedRateLimitGuard implements CanActivate {
       return true;
     }
 
+    const failOpen =
+      this.configService.get<boolean>('RATE_LIMIT_FAIL_OPEN') ?? false;
+    const retryCooldownMs =
+      this.configService.get<number>('RATE_LIMIT_RETRY_COOLDOWN_MS') || 1000;
+
+    if (this.limiterUnavailable) {
+      const now = Date.now();
+      if (now < this.nextRecoveryProbeAt) {
+        return this.applyUnavailablePolicy(failOpen);
+      }
+
+      // Reserve the next probe window before awaiting Redis. JavaScript executes
+      // this synchronously, so concurrent requests fail fast instead of creating
+      // a thundering herd while this request performs the recovery probe.
+      this.nextRecoveryProbeAt = now + retryCooldownMs;
+    }
+
     const request = context.switchToHttp().getRequest<HttpRequestLike>();
     const response = context.switchToHttp().getResponse<HttpReplyLike>();
     const limit = this.configService.get<number>('RATE_LIMIT_MAX') || 60;
@@ -56,7 +74,7 @@ export class DistributedRateLimitGuard implements CanActivate {
       .digest('hex');
     const key = `startkit:rate-limit:${digest}`;
 
-    let record;
+    let record: RateLimitRecord;
     try {
       record = await this.redisService.consumeSlidingWindow(
         key,
@@ -65,20 +83,9 @@ export class DistributedRateLimitGuard implements CanActivate {
       );
       this.markLimiterHealthy();
     } catch (error) {
-      const failOpen =
-        this.configService.get<boolean>('RATE_LIMIT_FAIL_OPEN') ?? false;
       const message = error instanceof Error ? error.message : String(error);
-      this.markLimiterUnavailable(message);
-
-      if (failOpen) {
-        return true;
-      }
-
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        message: 'Rate limiting service unavailable',
-        suppressErrorLog: true,
-      });
+      this.markLimiterUnavailable(message, retryCooldownMs);
+      return this.applyUnavailablePolicy(failOpen);
     }
 
     response.header('X-RateLimit-Limit', limit);
@@ -99,7 +106,22 @@ export class DistributedRateLimitGuard implements CanActivate {
     return true;
   }
 
-  private markLimiterUnavailable(message: string): void {
+  private applyUnavailablePolicy(failOpen: boolean): true {
+    if (failOpen) {
+      return true;
+    }
+
+    throw new ServiceUnavailableException({
+      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+      message: 'Rate limiting service unavailable',
+      suppressErrorLog: true,
+    });
+  }
+
+  private markLimiterUnavailable(
+    message: string,
+    retryCooldownMs: number,
+  ): void {
     const now = Date.now();
     if (
       !this.limiterUnavailable ||
@@ -108,7 +130,9 @@ export class DistributedRateLimitGuard implements CanActivate {
       this.logger.error(`Distributed rate limiter unavailable: ${message}`);
       this.lastFailureLogAt = now;
     }
+
     this.limiterUnavailable = true;
+    this.nextRecoveryProbeAt = now + retryCooldownMs;
   }
 
   private markLimiterHealthy(): void {
@@ -117,6 +141,7 @@ export class DistributedRateLimitGuard implements CanActivate {
     }
 
     this.limiterUnavailable = false;
+    this.nextRecoveryProbeAt = 0;
     this.lastFailureLogAt = 0;
     this.logger.log('Distributed rate limiter recovered');
   }

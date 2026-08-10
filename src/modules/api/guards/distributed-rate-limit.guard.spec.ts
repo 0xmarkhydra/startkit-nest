@@ -31,6 +31,7 @@ const createConfig = (overrides: Record<string, unknown> = {}) =>
         RATE_LIMIT_MAX: 10,
         RATE_LIMIT_TTL_SECONDS: 60,
         RATE_LIMIT_FAIL_OPEN: false,
+        RATE_LIMIT_RETRY_COOLDOWN_MS: 1000,
         ...overrides,
       };
       return values[key];
@@ -108,6 +109,48 @@ describe('DistributedRateLimitGuard', () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
+  it('fails fast during a fail-open Redis outage cooldown', async () => {
+    const redis = {
+      consumeSlidingWindow: jest.fn().mockRejectedValue(new Error('offline')),
+    } as unknown as RedisService;
+    const guard = new DistributedRateLimitGuard(
+      createConfig({
+        RATE_LIMIT_FAIL_OPEN: true,
+        RATE_LIMIT_RETRY_COOLDOWN_MS: 5000,
+      }),
+      reflector,
+      redis,
+    );
+
+    await expect(guard.canActivate(createContext().context)).resolves.toBe(true);
+    await expect(guard.canActivate(createContext().context)).resolves.toBe(true);
+
+    expect(redis.consumeSlidingWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails fast with 503 during a fail-closed Redis outage cooldown', async () => {
+    const redis = {
+      consumeSlidingWindow: jest.fn().mockRejectedValue(new Error('offline')),
+    } as unknown as RedisService;
+    const guard = new DistributedRateLimitGuard(
+      createConfig({
+        RATE_LIMIT_FAIL_OPEN: false,
+        RATE_LIMIT_RETRY_COOLDOWN_MS: 5000,
+      }),
+      reflector,
+      redis,
+    );
+
+    await expect(guard.canActivate(createContext().context)).rejects.toMatchObject({
+      status: 503,
+    });
+    await expect(guard.canActivate(createContext().context)).rejects.toMatchObject({
+      status: 503,
+    });
+
+    expect(redis.consumeSlidingWindow).toHaveBeenCalledTimes(1);
+  });
+
   it('throttles repeated outage logs per replica', async () => {
     const redis = {
       consumeSlidingWindow: jest.fn().mockRejectedValue(new Error('offline')),
@@ -125,5 +168,6 @@ describe('DistributedRateLimitGuard', () => {
     await guard.canActivate(createContext().context);
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(redis.consumeSlidingWindow).toHaveBeenCalledTimes(1);
   });
 });

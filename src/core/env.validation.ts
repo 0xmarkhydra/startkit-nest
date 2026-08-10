@@ -1,5 +1,16 @@
 type Environment = Record<string, unknown>;
 
+const APP_ENVIRONMENTS = new Set(['development', 'test', 'production']);
+const LOG_LEVELS = new Set([
+  'trace',
+  'debug',
+  'info',
+  'warn',
+  'error',
+  'fatal',
+  'silent',
+]);
+
 const hasValue = (value: unknown): boolean =>
   typeof value === 'string' && value.trim().length > 0;
 
@@ -45,54 +56,58 @@ const parseBooleanFlag = (value: unknown, fallback = false): boolean => {
 };
 
 export function validateEnvironment(config: Environment): Environment {
-  const appEnv = String(config.APP_ENV || 'development');
-  const errors: string[] = [];
+  const appEnv = String(config.APP_ENV || 'development').trim().toLowerCase();
+  if (!APP_ENVIRONMENTS.has(appEnv)) {
+    throw new Error(
+      `Invalid APP_ENV value: ${String(config.APP_ENV)}. Expected development, test or production`,
+    );
+  }
 
-  const hasDatabaseUrl = hasValue(config.DATABASE_URL);
-  const hasDatabaseFields =
-    hasValue(config.DB_HOST) &&
-    hasValue(config.DB_USERNAME) &&
-    hasValue(config.DB_PASSWORD) &&
-    hasValue(config.DB_DATABASE);
+  const logLevel = String(
+    config.LOG_LEVEL || (appEnv === 'production' ? 'info' : 'debug'),
+  )
+    .trim()
+    .toLowerCase();
+  if (!LOG_LEVELS.has(logLevel)) {
+    throw new Error(`Invalid LOG_LEVEL value: ${String(config.LOG_LEVEL)}`);
+  }
 
-  if (!hasDatabaseUrl && !hasDatabaseFields) {
-    errors.push(
-      'Configure DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD and DB_DATABASE',
+  const corsOrigins = String(config.CORS_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (appEnv === 'production' && corsOrigins.includes('*')) {
+    throw new Error(
+      'CORS_ORIGIN cannot contain * in production while credentialed CORS is enabled',
     );
   }
 
   const hasRedisUrl = hasValue(config.REDIS_URL);
   const hasRedisHost = hasValue(config.REDIS_HOST);
   if (!hasRedisUrl && !hasRedisHost) {
-    errors.push('Configure REDIS_URL or REDIS_HOST');
+    throw new Error(
+      'Invalid environment configuration:\n- Configure REDIS_URL or REDIS_HOST',
+    );
   }
 
-  if (errors.length > 0) {
-    throw new Error(`Invalid environment configuration:\n- ${errors.join('\n- ')}`);
+  const redisFamily = parseInteger(config.REDIS_FAMILY, 0, 'REDIS_FAMILY', 0);
+  if (![0, 4, 6].includes(redisFamily)) {
+    throw new Error(`Invalid REDIS_FAMILY value: ${String(config.REDIS_FAMILY)}`);
   }
 
   return {
     ...config,
     APP_ENV: appEnv,
+    LOG_LEVEL: logLevel,
     PORT: parsePort(config.PORT, 8000),
-    DB_PORT: parsePort(config.DB_PORT, 5432),
     REDIS_PORT: parsePort(config.REDIS_PORT, 6379),
-    DB_POOL_MAX: parseInteger(config.DB_POOL_MAX, 10, 'DB_POOL_MAX'),
-    DB_CONNECTION_TIMEOUT_MS: parseInteger(
-      config.DB_CONNECTION_TIMEOUT_MS,
-      5000,
-      'DB_CONNECTION_TIMEOUT_MS',
+    REDIS_DATABASE: parseInteger(
+      config.REDIS_DATABASE,
+      0,
+      'REDIS_DATABASE',
+      0,
     ),
-    DB_IDLE_TIMEOUT_MS: parseInteger(
-      config.DB_IDLE_TIMEOUT_MS,
-      30000,
-      'DB_IDLE_TIMEOUT_MS',
-    ),
-    DB_STATEMENT_TIMEOUT_MS: parseInteger(
-      config.DB_STATEMENT_TIMEOUT_MS,
-      30000,
-      'DB_STATEMENT_TIMEOUT_MS',
-    ),
+    REDIS_FAMILY: redisFamily,
     RATE_LIMIT_MAX: parseInteger(
       config.RATE_LIMIT_MAX,
       appEnv === 'production' ? 60 : 600,
@@ -104,6 +119,11 @@ export function validateEnvironment(config: Environment): Environment {
       'RATE_LIMIT_TTL_SECONDS',
     ),
     RATE_LIMIT_FAIL_OPEN: parseBooleanFlag(config.RATE_LIMIT_FAIL_OPEN, false),
+    RATE_LIMIT_RETRY_COOLDOWN_MS: parseInteger(
+      config.RATE_LIMIT_RETRY_COOLDOWN_MS,
+      1000,
+      'RATE_LIMIT_RETRY_COOLDOWN_MS',
+    ),
     WORKER_CONCURRENCY: parseInteger(
       config.WORKER_CONCURRENCY,
       10,
@@ -128,6 +148,11 @@ export function validateEnvironment(config: Environment): Environment {
       config.HTTP_KEEP_ALIVE_TIMEOUT_MS,
       65000,
       'HTTP_KEEP_ALIVE_TIMEOUT_MS',
+    ),
+    DEPENDENCY_CHECK_TIMEOUT_MS: parseInteger(
+      config.DEPENDENCY_CHECK_TIMEOUT_MS,
+      2000,
+      'DEPENDENCY_CHECK_TIMEOUT_MS',
     ),
   };
 }

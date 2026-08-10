@@ -1,7 +1,6 @@
 import { Global, Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import { configDb } from '@/database/configs';
 import { configRedis } from '@/redis/configs/redis';
 import { validateEnvironment } from './env.validation';
 
@@ -13,7 +12,7 @@ import { validateEnvironment } from './env.validation';
       cache: true,
       expandVariables: true,
       validate: validateEnvironment,
-      load: [configDb, configRedis],
+      load: [configRedis],
     }),
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
@@ -58,7 +57,10 @@ import { validateEnvironment } from './env.validation';
           },
           exclude: [
             { method: RequestMethod.ALL, path: 'health' },
+            { method: RequestMethod.ALL, path: 'health/live' },
             { method: RequestMethod.ALL, path: 'health/ready' },
+            { method: RequestMethod.ALL, path: 'health/dependencies' },
+            { method: RequestMethod.ALL, path: 'metrics' },
           ],
         };
       },

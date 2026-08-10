@@ -16,6 +16,12 @@ export class QueueService {
 
   async addSampleJob(payload: SampleJobPayload) {
     return this.sampleQueue.add(QUEUE_PROCESSOR.SAMPLE.HANDLE, payload, {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 1000,
+      },
+      timeout: 30000,
       removeOnComplete: 20,
       removeOnFail: 50,
     });
