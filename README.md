@@ -1,28 +1,40 @@
 # Startkit Nest
 
-A production-minded NestJS starter kit for horizontally scalable HTTP APIs and background workers. It uses Fastify, PostgreSQL, Redis, Bull, structured logging, strict configuration validation, health contracts, Prometheus-compatible process metrics, migrations, and multi-replica smoke tests.
+A production-minded NestJS starter for horizontally scalable Fastify APIs and background workers. The foundation includes PostgreSQL, Redis, Bull queues, strict configuration validation, structured logging, health contracts, protected Prometheus-compatible metrics, TypeORM migrations, Docker/Nginx examples, and multi-replica failure-policy tests.
 
-## What this starter provides
+The starter deliberately avoids product-specific authentication, entities, business DTOs, WebSockets, schedulers, and third-party integrations. Add those as explicit application modules when the product actually needs them.
+
+## Core properties
 
 - Fastify-based NestJS API
-- Separate stateless API and worker entrypoints
-- PostgreSQL through TypeORM with bounded per-process connection pools
-- Redis-backed distributed rate limiting shared by all API replicas
-- Bull queues with independently scalable workers
-- One Redis configuration model for `redis://`, `rediss://`, and host/port deployments
-- Configurable worker concurrency plus bounded retry/backoff defaults
-- Liveness, readiness, dependency diagnostics, and Prometheus-compatible process metrics
-- Strict production guardrails for environment names, database synchronization, and credentialed CORS
-- Request body, connection, request, keep-alive, and dependency-probe timeouts
-- Reverse-proxy-aware client IP handling with bounded trusted-hop support
-- Nginx load-balancer example for local multi-replica Docker Compose
-- Graceful container signal handling through `tini`
-- Swagger in non-production environments
-- TypeORM migration commands using a dedicated CLI data source
-- Dependency-free HTTP load-smoke script with p50/p95/p99 output
-- Unit, e2e, Docker, Nginx, failure-policy, worker-isolation, and multi-replica CI contracts
+- Separate API and worker entrypoints
+- Strict TypeScript with `strict`, `noUncheckedIndexedAccess`, unused-code checks, and casing checks
+- Type-aware ESLint for source and tests
+- PostgreSQL through TypeORM with bounded per-process pools
+- Redis-backed distributed sliding-window rate limiting shared by all API replicas
+- Bull worker tier that waits for Redis/queue readiness before reporting startup success
+- One Redis connection resolver for both API Redis and Bull
+- Bounded API-path Redis connect and command timeouts
+- Fail-open/fail-closed Redis outage policy with rate-limiter recovery cooldown
+- Liveness, readiness, protected dependency diagnostics, and protected raw metrics
+- TypeORM migration CLI using the same production image
+- Strict production CORS, proxy-trust, database-sync, and internal-token guardrails
+- Structured logging with sensitive headers and production request URLs redacted
+- Query strings stripped from request/error log messages
+- Nginx multi-replica example with spoof-resistant client IP handling
+- Dependency-free load smoke with p50/p95/p99 output
+- GitHub Actions contracts for lint, build, tests, Docker, failure modes, workers, migrations, and horizontal scaling
+- Weekly Dependabot checks for npm, Actions, and Docker images
 
-The core intentionally does not ship product-specific authentication, entities, AI integrations, WebSocket events, or scheduled jobs. Add product behavior as explicit application modules rather than putting it into the starter foundation.
+## Requirements
+
+- Node.js **20.6+**
+- pnpm **9.15.9**
+- PostgreSQL 16+
+- Redis 7+
+- Docker when using the bundled Compose/CI smoke topology
+
+The repository pins pnpm in `package.json`, CI, and the Docker build so the package manager does not drift between environments.
 
 ## Architecture
 
@@ -44,41 +56,36 @@ The core intentionally does not ship product-specific authentication, entities, 
                                Worker #1       Worker #M
 ```
 
-API coordination state lives outside the process. Rate-limit counters live in Redis and persistent application data lives in PostgreSQL. Workers consume Bull queues from Redis and scale independently from API replicas.
-
-Infrastructure dependencies are scoped to the process that uses them. The API imports `DatabaseModule` and Redis. The sample worker imports the queue layer and Redis but does not require PostgreSQL configuration or open a PostgreSQL pool.
+Shared coordination state stays outside API processes. Persistent application state belongs in PostgreSQL; rate-limit state and Bull queues live in Redis. The sample worker does not import `DatabaseModule`, does not open a PostgreSQL pool, and does not receive API/database secrets in the bundled Compose topology.
 
 ## Source layout
 
 ```text
 src/
-├── main.ts                         # Fastify API entrypoint
-├── worker.ts                       # Background worker entrypoint
-├── app.module.ts                   # API application root
-├── worker-app.module.ts            # Worker application root
-├── core/                           # Global config, HTTP options and logging
+├── main.ts                         # Fastify API bootstrap
+├── worker.ts                       # Worker bootstrap
+├── app.module.ts                   # API root module
+├── worker-app.module.ts            # Worker root module
+├── core/                           # config, logging, HTTP/network safety
 ├── modules/
-│   ├── api/                        # Controllers, filters, guards, interceptors
+│   ├── api/                        # controllers, guard, filter, interceptor
 │   ├── database/
-│   │   ├── configs/                # Runtime DB configuration
+│   │   ├── configs/                # runtime DB config
 │   │   ├── data-source.ts          # TypeORM CLI data source
-│   │   └── migrations/             # Application migrations
-│   ├── queue/                      # Bull infrastructure and producers
-│   ├── redis/                      # Shared Redis configuration/client
-│   └── worker/                     # Queue consumers
-└── shared/                         # Shared contracts and decorators
+│   │   └── migrations/             # application migrations
+│   ├── queue/                      # Bull config and producers
+│   ├── redis/                      # shared Redis resolver/client
+│   └── worker/                     # queue consumers and startup readiness
+└── shared/                         # neutral contracts/decorators/constants
+
+scripts/
+├── typeorm-cli.mjs                 # environment-aware TypeORM CLI runner
+└── ci-smoke.sh                     # reusable Docker failure/scaling smoke
 
 test/
-├── app.e2e-spec.ts                 # API + DB + Redis contracts
-└── load-smoke.mjs                  # Dependency-free HTTP load smoke
+├── app.e2e-spec.ts                 # API + PostgreSQL + Redis contracts
+└── load-smoke.mjs                  # dependency-free HTTP load smoke
 ```
-
-## Requirements
-
-- Node.js 20+
-- pnpm 9
-- PostgreSQL 16+
-- Redis 7+
 
 ## Local development
 
@@ -90,43 +97,23 @@ docker compose up -d postgres redis
 pnpm run start:dev
 ```
 
-Run the worker separately:
+Run the worker in another terminal:
 
 ```bash
 pnpm run start:worker:dev
 ```
 
-Useful endpoints:
+Useful development endpoints:
 
 ```text
-GET http://localhost:8000/                     # rate-limited service info + instanceId
-GET http://localhost:8000/health               # backwards-compatible liveness
-GET http://localhost:8000/health/live          # explicit liveness
-GET http://localhost:8000/health/ready         # traffic readiness policy
-GET http://localhost:8000/health/dependencies  # dependency diagnostics
-GET http://localhost:8000/metrics              # raw Prometheus-compatible process metrics
-GET http://localhost:8000/docs                 # non-production only
+GET /                    service info + instanceId, rate limited
+GET /health              backwards-compatible liveness
+GET /health/live         explicit liveness
+GET /health/ready        traffic readiness
+GET /health/dependencies dependency diagnostics
+GET /metrics             raw Prometheus-compatible process metrics
+GET /docs                Swagger, non-production only
 ```
-
-## Horizontal scaling with Docker Compose
-
-The Compose topology exposes only the Nginx gateway on host port `8000`. API containers use the internal Docker network, so replicas do not compete for host ports.
-
-Start three APIs and four workers:
-
-```bash
-docker compose up --build --scale api=3 --scale worker=4
-```
-
-Repeated liveness requests expose the serving replica:
-
-```bash
-curl http://localhost:8000/health
-```
-
-The response contains `instanceId`, normally derived from the container hostname.
-
-The bundled Nginx configuration dynamically resolves the Docker `api` service. Production deployments should normally use the platform load balancer/ingress rather than treating the bundled Nginx file as a universal production ingress.
 
 ## Environment safety
 
@@ -138,177 +125,252 @@ test
 production
 ```
 
-Unknown values fail startup. A typo such as `APP_ENV=prodution` therefore cannot silently enable Swagger, development error exposure, or development rate-limit defaults.
+Unknown values fail startup. A typo such as `prodution` cannot silently switch the application into development behavior.
 
-The API enables credentialed CORS. For that reason `CORS_ORIGIN=*` is rejected in production. Use an explicit comma-separated list of trusted frontend origins, or leave CORS disabled when the API does not need browser cross-origin access.
+`LOG_LEVEL` is also whitelist validated. Numeric ports, pool sizes, timeouts, Redis database indexes, worker concurrency, and recovery settings fail fast when malformed instead of silently falling back.
 
-## PostgreSQL configuration and pool sizing
+See `.env.sample` for the canonical list and defaults.
 
-Database configuration is validated only when a process imports `DatabaseModule`. Configure either `DATABASE_URL` or the complete host/user/password/database field set.
+## CORS
 
-`DATABASE_URL` is passed to the PostgreSQL driver intact, so TLS and managed-database query parameters are preserved.
+Use a comma-separated list of exact HTTP/HTTPS origins:
 
-`DB_POOL_MAX` is the maximum pool size for each process that imports `DatabaseModule`:
-
-```text
-application DB connections ≈ DB-using replicas × DB_POOL_MAX
+```env
+CORS_ORIGIN=https://app.example.com,https://admin.example.com
 ```
 
-With the starter as shipped, only API replicas import the database module. For example:
+Origins with paths are rejected. In production, `*` is rejected because credentialed wildcard CORS is unsafe.
 
-```text
-5 API replicas
-DB_POOL_MAX=10
-upper bound ≈ 50 application PostgreSQL connections
+For local/test use only, `CORS_ORIGIN=*` is allowed and the runtime automatically disables credentials for that wildcard mode.
+
+Leave `CORS_ORIGIN` empty when browser cross-origin access is not needed.
+
+## Reverse proxy and client IP safety
+
+Fastify uses `request.ip` for the distributed rate-limit key.
+
+```env
+TRUST_PROXY=0
+TRUST_PROXY=1
+TRUST_PROXY=10.0.0.0/8
+TRUST_PROXY=2001:db8::/32
 ```
 
-Leave headroom for migrations, administration and monitoring. At larger scale, use a managed pooler or PgBouncer rather than continually increasing PostgreSQL connection counts.
+- `0` / `false`: trust no proxy
+- positive integer: trust that many hops
+- IP/CIDR: trust the explicit proxy/network
+- `true`: accepted only outside production
+
+Production rejects `TRUST_PROXY=true`. Malformed values are rejected before Fastify bootstrap.
+
+The bundled Nginx example overwrites `X-Forwarded-For` with the remote address it observes instead of forwarding arbitrary caller-supplied XFF chains. Configure the real trusted topology when deploying behind a cloud ingress/load balancer.
+
+## PostgreSQL
+
+Configure either `DATABASE_URL` or the complete host-mode field set.
+
+`DATABASE_URL` is passed to the PostgreSQL driver intact so TLS and managed-database query parameters are not lost.
+
+### Pool sizing
+
+`DB_POOL_MAX` applies per process that imports `DatabaseModule`:
+
+```text
+maximum application DB connections ≈ DB-using replicas × DB_POOL_MAX
+```
+
+The sample API imports the database module; the sample worker does not.
 
 ### Production schema safety
 
-`DB_SYNC` is strictly parsed. In production, enabling it is a startup error:
+`DB_SYNC` is strictly parsed. Production refuses to boot when synchronization is enabled:
 
 ```text
 APP_ENV=production
 DB_SYNC=1
-→ application refuses to boot
+→ startup failure
 ```
 
-Use migrations for production schema changes.
+Use controlled migrations instead.
 
 ## Database migrations
 
-The starter includes a dedicated TypeORM CLI data source. Runtime entity discovery and migration execution are deliberately separate: application replicas never auto-run migrations during startup.
-
-Inspect pending/applied migrations:
+The starter has a dedicated TypeORM CLI data source. Application replicas never auto-run migrations on startup.
 
 ```bash
 pnpm run migration:show
-```
-
-Create an empty migration:
-
-```bash
 pnpm run migration:create -- src/modules/database/migrations/CreateUsers
-```
-
-Generate a migration after adding/changing entities:
-
-```bash
 pnpm run migration:generate -- src/modules/database/migrations/UpdateSchema
-```
-
-Run migrations as a dedicated deployment/release step:
-
-```bash
-APP_ENV=production DB_SYNC=0 pnpm run migration:run
-```
-
-Revert the most recent migration when appropriate:
-
-```bash
+pnpm run migration:run
 pnpm run migration:revert
 ```
 
-Do not run migration commands concurrently from every API replica. In production, execute them from one controlled release job/task before or during deployment according to your rollout strategy.
+The CLI runner loads local `.env` when that file exists. Deployment-provided environment variables continue to be used in release jobs, and the production Docker image includes the migration runner.
 
-## Distributed rate limiting
+Run production migrations from **one controlled release task**, not concurrently from every API replica.
 
-All API replicas consume from the same Redis sliding window for a route + client IP.
+## Redis connection behavior
 
-```env
-RATE_LIMIT_MAX=600
-RATE_LIMIT_TTL_SECONDS=60
-RATE_LIMIT_FAIL_OPEN=0
-```
-
-The Lua operation is atomic and bounded. Once a window contains `RATE_LIMIT_MAX` accepted entries, blocked requests are not appended to the sorted set, so rejected traffic cannot grow one rate-limit key without bound.
-
-The script is registered through ioredis `defineCommand`, allowing Redis script caching instead of transmitting the full Lua script for every request.
-
-Redis outage logs are state-aware and throttled per replica rather than emitted on every failed request.
-
-### Fail-closed vs fail-open
-
-With the default:
-
-```env
-RATE_LIMIT_FAIL_OPEN=0
-```
-
-Redis loss causes rate-limited requests to return `503` and `/health/ready` to return non-200. This favors quota/security consistency.
-
-With:
-
-```env
-RATE_LIMIT_FAIL_OPEN=1
-```
-
-Redis loss allows requests to continue and `/health/ready` remains `200`, with Redis reported as `degraded`. This favors API availability. Choose deliberately based on the product's abuse and availability requirements.
-
-The example Nginx gateway does not retry application `503` responses across every API replica, avoiding cascading retries during a shared Redis outage.
-
-Health and metrics endpoints are excluded from rate limiting.
-
-## Health contracts
-
-`/health` and `/health/live` are process liveness checks. They do not depend on PostgreSQL or Redis.
-
-`/health/ready` answers whether the instance should receive traffic:
-
-- PostgreSQL is always required for the API.
-- Redis is required when rate limiting is fail-closed.
-- Redis may be `degraded` while readiness remains healthy when fail-open is explicitly enabled.
-
-Dependency probes have their own timeout:
-
-```env
-DEPENDENCY_CHECK_TIMEOUT_MS=2000
-```
-
-`/health/dependencies` reports PostgreSQL and Redis state without applying load-balancer readiness policy. It is useful for diagnostics.
-
-## Metrics
-
-`GET /metrics` returns raw Prometheus text and is intentionally not wrapped by the global JSON response interceptor.
-
-It exposes dependency-free process-level metrics including:
-
-- process uptime
-- resident memory
-- Node heap used/total
-- process user/system CPU time
-- `instance_id` labels for replica visibility
-
-The endpoint contains no application secrets, but production deployments should still restrict it at the ingress/network layer to the monitoring system when metrics should not be public.
-
-This is a lightweight baseline rather than a replacement for full observability. Add request histograms, business metrics, distributed tracing and OpenTelemetry when the application needs them.
-
-## Reverse proxy and client IP security
-
-Fastify uses `request.ip` for the distributed rate-limit key. `TRUST_PROXY` supports:
-
-```env
-TRUST_PROXY=0          # trust no proxy
-TRUST_PROXY=1          # trust exactly one proxy hop
-TRUST_PROXY=10.0.0.0/8 # explicit trusted network
-```
-
-The bundled Docker topology uses one Nginx hop, so Compose sets `TRUST_PROXY=1`. Nginx overwrites `X-Forwarded-For` with the remote address it observes instead of forwarding an arbitrary client-supplied XFF chain. This prevents callers from rotating forged XFF values to bypass the example IP quota.
-
-For a production ingress chain, configure the real trusted proxy addresses/hops and normalize forwarded headers at the outer trusted edge.
-
-## Redis connection configuration
-
-`REDIS_URL` is preferred:
+Prefer a URL:
 
 ```env
 REDIS_URL=redis://localhost:6379/0
 ```
 
-Managed TLS Redis can use `rediss://`. The same Redis configuration namespace is used by the distributed limiter and Bull so protocol/TLS semantics do not diverge between modules.
+`rediss://` URLs are preserved intact. Host/port/user/password mode remains available when a URL is not configured.
 
-Host/port/user/password fields remain available when a URL is not supplied.
+API Redis and Bull both use the same connection resolver, so protocol/host/database semantics cannot silently diverge between the two paths.
+
+API request-path Redis operations have explicit bounds:
+
+```env
+REDIS_CONNECT_TIMEOUT_MS=5000
+REDIS_COMMAND_TIMEOUT_MS=2000
+```
+
+Those bounds prevent a Redis outage from holding request-path operations indefinitely.
+
+## Distributed rate limiting
+
+```env
+RATE_LIMIT_MAX=600
+RATE_LIMIT_TTL_SECONDS=60
+RATE_LIMIT_RETRY_COOLDOWN_MS=1000
+RATE_LIMIT_FAIL_OPEN=0
+```
+
+The limiter uses an atomic Redis Lua sliding window. Accepted entries are bounded by the configured quota; rejected traffic does not append unlimited records to the sorted set.
+
+The Lua command is registered through ioredis `defineCommand`, and returned values are validated before the API uses them.
+
+When Redis becomes unavailable, the guard enters a per-replica recovery cooldown. Requests fail fast during the cooldown and only one request per window probes recovery, avoiding a reconnect thundering herd.
+
+### Fail-closed
+
+Default:
+
+```env
+RATE_LIMIT_FAIL_OPEN=0
+```
+
+- rate-limited routes return `503` when Redis is unavailable
+- `/health/ready` becomes non-ready
+- favors quota/security consistency
+
+### Fail-open
+
+```env
+RATE_LIMIT_FAIL_OPEN=1
+```
+
+- traffic may continue while Redis is unavailable
+- `/health/ready` stays `200`
+- readiness reports Redis as `degraded`
+- favors API availability
+
+Choose this deliberately based on abuse risk and availability requirements.
+
+## Health contracts
+
+### Liveness
+
+`/health` and `/health/live` only answer whether the API process is alive. They do not probe shared dependencies.
+
+### Readiness
+
+`/health/ready` answers whether the instance should receive traffic:
+
+- PostgreSQL is always required by the sample API
+- Redis is required in fail-closed mode
+- Redis may be `degraded` while readiness remains healthy only when fail-open is explicitly enabled
+
+Dependency probes are bounded:
+
+```env
+DEPENDENCY_CHECK_TIMEOUT_MS=2000
+```
+
+### Protected dependency diagnostics
+
+`/health/dependencies` reports PostgreSQL and Redis state without applying readiness policy.
+
+Outside production it is available directly. In production it is an internal endpoint governed by `INTERNAL_ENDPOINT_TOKEN`.
+
+## Metrics and internal endpoint protection
+
+`GET /metrics` returns raw Prometheus-compatible text and opts out of the global JSON response envelope.
+
+Current dependency-free process metrics include:
+
+- uptime
+- resident memory
+- Node heap used/total
+- user/system CPU time
+- `instance_id` label
+
+Production `/metrics` and `/health/dependencies` follow this policy:
+
+```env
+INTERNAL_ENDPOINT_TOKEN=
+```
+
+- empty/unset: the endpoints are hidden with `404`
+- configured: token must be at least 32 characters
+- callers must send `Authorization: Bearer <token>`
+- invalid/missing bearer token returns `401`
+
+Use a deployment secret store for the token. In high-security environments, network/ingress restrictions can be layered on top of this application-level control.
+
+## Worker and queue behavior
+
+The sample worker needs Redis but not PostgreSQL.
+
+```env
+WORKER_CONCURRENCY=10
+WORKER_STARTUP_TIMEOUT_MS=10000
+```
+
+Worker bootstrap waits for Bull `queue.isReady()`. If Bull cannot become Redis-ready within `WORKER_STARTUP_TIMEOUT_MS`, application bootstrap fails rather than logging a false healthy startup state.
+
+The bundled Compose worker also has a Redis healthcheck after startup.
+
+Sample job defaults are deliberately bounded:
+
+```text
+attempts: 3
+backoff: exponential, 1 second base
+job timeout: 30 seconds
+completed history: 20
+failed history: 50
+```
+
+The sample consumer logs job metadata only, not the queue payload content.
+
+Scale independently:
+
+```bash
+docker compose up --scale api=3 --scale worker=8
+```
+
+Tune concurrency/retries/timeouts for each real job's idempotency, latency, and cost profile.
+
+## Docker Compose topology
+
+Start the example topology:
+
+```bash
+docker compose up --build --scale api=3 --scale worker=4
+```
+
+Important local-safety details:
+
+- only Nginx exposes the public application port `8000`
+- API replicas use internal Docker ports
+- PostgreSQL and Redis host ports are bound to `127.0.0.1`, not all host interfaces
+- the worker does not load the API `.env` file and therefore does not receive database/API-only secrets in the sample topology
+- API and worker use the same production image with different commands
+
+For real production, prefer the deployment platform's ingress/load balancer rather than treating the bundled Nginx file as a universal ingress solution.
 
 ## HTTP limits and timeouts
 
@@ -320,149 +382,19 @@ HTTP_KEEP_ALIVE_TIMEOUT_MS=65000
 DEPENDENCY_CHECK_TIMEOUT_MS=2000
 ```
 
-Keep external load-balancer timeouts aligned with the application. Long-running work should normally move to Bull rather than holding HTTP connections open.
+Keep upstream load-balancer timeouts aligned. Long-running work should normally move to a queue instead of holding an HTTP request open.
 
-## Worker and queue behavior
+## Logging privacy
 
-The sample worker does not require PostgreSQL. It can boot with Redis configuration only.
+Production logging redacts common sensitive headers, including authorization, cookies, API keys, proxy authorization, and set-cookie values.
 
-Each worker process can process multiple jobs concurrently:
+Raw production request URLs are redacted from structured request objects, and human-readable request/error log messages strip query strings. This prevents accidental query parameters such as callback codes or tokens from being written into routine logs.
 
-```env
-WORKER_CONCURRENCY=10
-```
+The sample worker avoids logging job payload content.
 
-The sample producer demonstrates safe bounded defaults:
+## API response contracts
 
-```text
-attempts: 3
-backoff: exponential, 1 second base
-job timeout: 30 seconds
-bounded completed/failed history
-```
-
-These are starter defaults, not universal values. Tune attempts, timeout and concurrency to the idempotency and cost of each real job type.
-
-Scale workers independently:
-
-```bash
-docker compose up --scale api=3 --scale worker=8
-```
-
-I/O-bound jobs can usually use higher concurrency than CPU-heavy jobs. CPU-heavy work may need lower per-process concurrency or dedicated worker tiers.
-
-## Load smoke
-
-A dependency-free Node 20 load-smoke script provides a fast capacity regression check without adding a benchmark framework to the starter:
-
-```bash
-LOAD_URL=http://localhost:8000/health \
-LOAD_REQUESTS=1000 \
-LOAD_CONCURRENCY=50 \
-LOAD_P95_MAX_MS=250 \
-LOAD_MIN_INSTANCES=1 \
-pnpm run test:load
-```
-
-It prints request count, failures, reached replicas, and p50/p95/p99 latency. CI uses it behind the three-replica Nginx topology and requires at least two serving replicas.
-
-This smoke test is a regression guard, not a capacity certification. Establish real baselines on production-like infrastructure with realistic endpoints and payloads before setting service SLOs.
-
-## Main environment settings
-
-See `.env.sample` for the full set.
-
-```env
-APP_ENV=development
-LOG_LEVEL=debug
-PORT=8000
-CORS_ORIGIN=http://localhost:3000
-INSTANCE_ID=
-TRUST_PROXY=0
-
-HTTP_BODY_LIMIT_BYTES=1048576
-HTTP_REQUEST_TIMEOUT_MS=30000
-HTTP_CONNECTION_TIMEOUT_MS=10000
-HTTP_KEEP_ALIVE_TIMEOUT_MS=65000
-DEPENDENCY_CHECK_TIMEOUT_MS=2000
-
-DATABASE_URL=postgresql://startkit:startkit@localhost:5432/startkit
-DB_DEBUG=0
-DB_SYNC=0
-DB_POOL_MAX=10
-DB_CONNECTION_TIMEOUT_MS=5000
-DB_IDLE_TIMEOUT_MS=30000
-DB_STATEMENT_TIMEOUT_MS=30000
-
-REDIS_URL=redis://localhost:6379/0
-RATE_LIMIT_MAX=600
-RATE_LIMIT_TTL_SECONDS=60
-RATE_LIMIT_FAIL_OPEN=0
-
-WORKER_CONCURRENCY=10
-```
-
-For production:
-
-- use only `APP_ENV=production`;
-- keep `DB_SYNC=0` and deploy schema changes through a controlled migration job;
-- restrict `CORS_ORIGIN` to trusted frontends when browser CORS is needed;
-- keep API instances stateless;
-- store sessions, locks, quotas and shared state outside process memory;
-- run API and worker tiers as separate deployments and autoscale independently;
-- trust only the actual proxy chain;
-- size aggregate PostgreSQL pools before raising replica counts;
-- use managed/HA PostgreSQL and Redis when availability requires it;
-- restrict `/metrics` at the network/ingress layer when appropriate;
-- store secrets in the deployment platform rather than committed files.
-
-## CI contracts
-
-CI is designed to verify architecture, not just TypeScript compilation. The workflow:
-
-1. installs from the frozen pnpm lockfile;
-2. runs lint;
-3. builds TypeScript;
-4. runs unit tests;
-5. runs PostgreSQL/Redis e2e tests, including raw `/metrics` output;
-6. validates Docker Compose and Nginx;
-7. builds the production image;
-8. proves an invalid `APP_ENV` cannot boot;
-9. proves production `DB_SYNC=1` cannot boot;
-10. boots three API replicas with `DB_SYNC=0`;
-11. boots the worker without database configuration;
-12. boots an API against an unavailable Redis with fail-open enabled and verifies readiness reports Redis as degraded;
-13. runs a p95 load smoke through Nginx and requires traffic to reach multiple replicas;
-14. sends forged `X-Forwarded-For` values across replicas and verifies the shared quota still returns `200,200,200,429`.
-
-The workflow cancels obsolete in-progress runs for the same ref and avoids duplicate feature-branch push + pull-request runs.
-
-## Scripts
-
-| Command | Purpose |
-|---|---|
-| `pnpm run start:dev` | Run the API in watch mode |
-| `pnpm run start:worker:dev` | Run the worker in watch mode |
-| `pnpm run build` | Compile TypeScript entrypoints |
-| `pnpm run start:prod` | Run the compiled API |
-| `pnpm run start:worker:prod` | Run the compiled worker |
-| `pnpm run lint` | Check lint rules |
-| `pnpm run lint:fix` | Fix ESLint issues |
-| `pnpm run format` | Format TypeScript test/source files |
-| `pnpm run test` | Run unit tests |
-| `pnpm run test:e2e` | Run integration/e2e contracts |
-| `pnpm run test:cov` | Generate Jest coverage |
-| `pnpm run test:load` | Run dependency-free HTTP load smoke |
-| `pnpm run migration:show` | Show migration state |
-| `pnpm run migration:run` | Run pending migrations |
-| `pnpm run migration:revert` | Revert the latest migration |
-| `pnpm run migration:generate -- <path>` | Generate migration from entity changes |
-| `pnpm run migration:create -- <path>` | Create an empty migration |
-| `pnpm run check` | Lint, build and run unit tests |
-
-## API responses
-
-Normal successful controller responses are wrapped globally:
+Successful controller responses are wrapped globally:
 
 ```json
 {
@@ -473,40 +405,119 @@ Normal successful controller responses are wrapped globally:
 }
 ```
 
-Machine-readable endpoints can explicitly opt out of this wrapper; `/metrics` uses that mechanism to emit Prometheus text.
+Machine-readable routes can opt out; `/metrics` does so to emit raw text.
 
-Unexpected production errors return a generic message and an `errorId` rather than internal exception details.
+Client errors use the same snake-case status field:
+
+```json
+{
+  "status_code": 400,
+  "message": "Invalid request",
+  "timestamp": "2026-08-10T00:00:00.000Z"
+}
+```
+
+Unexpected production 5xx responses do not expose internal exception details:
+
+```json
+{
+  "status_code": 500,
+  "message": "Internal server error",
+  "error_id": "...",
+  "timestamp": "2026-08-10T00:00:00.000Z"
+}
+```
+
+Use `error_id` to correlate the user-visible failure with server logs.
+
+## Load regression smoke
+
+A dependency-free Node script provides a fast regression guard:
+
+```bash
+LOAD_URL=http://localhost:8000/health \
+LOAD_REQUESTS=1000 \
+LOAD_CONCURRENCY=50 \
+LOAD_P95_MAX_MS=250 \
+LOAD_MIN_INSTANCES=1 \
+pnpm run test:load
+```
+
+It reports failures, serving replica IDs, p50, p95, and p99. This is a regression smoke test, not a production capacity certification.
+
+## CI contracts
+
+The workflow uses least-privilege `contents: read`, cancels obsolete runs for the same ref, and has a 30-minute job timeout.
+
+It verifies:
+
+1. frozen pnpm install with the pinned package-manager version
+2. type-aware ESLint
+3. strict TypeScript build
+4. unit tests
+5. PostgreSQL/Redis e2e tests
+6. Docker Compose validation
+7. Nginx configuration validation
+8. production image build
+9. invalid `APP_ENV` fails startup for the expected reason
+10. production wildcard CORS fails startup
+11. production `TRUST_PROXY=true` fails startup
+12. production `DB_SYNC=1` fails startup
+13. the production image can execute the migration CLI
+14. three API replicas become ready
+15. protected metrics reject unauthenticated access and accept the configured token
+16. protected dependency diagnostics report connected dependencies
+17. a worker without DB configuration reaches Bull readiness
+18. fail-open API readiness tolerates an unavailable Redis and reports `degraded`
+19. the Nginx gateway reaches multiple replicas under load
+20. spoofed `X-Forwarded-For` values cannot bypass the shared Redis quota
+
+The Docker/failure portion lives in `scripts/ci-smoke.sh`, which can also be run manually in an equivalent environment. It installs an EXIT trap so containers/network are cleaned even when an assertion fails.
+
+## Scripts
+
+| Command | Purpose |
+|---|---|
+| `pnpm run start:dev` | Run API in watch mode |
+| `pnpm run start:worker:dev` | Run worker in watch mode |
+| `pnpm run build` | Strict TypeScript build |
+| `pnpm run start:prod` | Run compiled API |
+| `pnpm run start:worker:prod` | Run compiled worker |
+| `pnpm run lint` | Run type-aware lint rules |
+| `pnpm run lint:fix` | Apply ESLint fixes |
+| `pnpm run format` | Format TypeScript source/tests |
+| `pnpm run test` | Unit tests |
+| `pnpm run test:e2e` | Integration/e2e tests |
+| `pnpm run test:cov` | Jest coverage |
+| `pnpm run test:load` | HTTP load regression smoke |
+| `pnpm run migration:show` | Show migration state |
+| `pnpm run migration:run` | Run pending migrations |
+| `pnpm run migration:revert` | Revert latest migration |
+| `pnpm run migration:generate -- <path>` | Generate migration from entity changes |
+| `pnpm run migration:create -- <path>` | Create empty migration |
+| `pnpm run check` | Lint + build + unit tests |
 
 ## Database schema
 
-The starter intentionally does not create placeholder product tables. Add entities and a real migration with the first product feature. Readiness uses `SELECT 1` and does not depend on an application table.
+The starter intentionally does not ship placeholder product tables. Add the first real entity and migration together with the first product feature. Readiness uses `SELECT 1` and does not depend on an application table.
 
 ## Deployment image
 
-The same image can run either process:
+The same non-root image can run API, worker, or migration jobs:
 
 ```bash
 node dist/main.js
 node dist/worker.js
+node scripts/typeorm-cli.mjs migration:run
 ```
 
-`tini` is the container entrypoint so termination signals reach Node cleanly during rolling deployments and scale-down operations.
+`tini` is the image entrypoint so termination signals reach Node during rolling deployments and scale-down.
 
-## What this foundation does not solve automatically
+## What remains product-specific
 
-Horizontal replicas and guardrails do not fix inefficient SQL, N+1 queries, missing indexes, oversized responses, synchronous CPU-heavy code, slow external providers, bad job idempotency, weak authentication/authorization, or poor product-specific data modeling.
+The foundation intentionally does not attempt to solve application-specific concerns such as inefficient SQL, missing indexes, authorization models, idempotency keys, WebSocket state, scheduler ownership, third-party provider resilience, or business SLOs.
 
-Before scaling a real application, watch at least p95/p99 latency, error rate, CPU, memory, PostgreSQL saturation, Redis latency, queue depth, retry rate, and external-provider latency. Add application-specific metrics and tracing where those signals matter.
-
-## Roadmap
-
-The remaining roadmap is intentionally product-dependent rather than generic starter baggage:
-
-1. add the first real entity + migration together with the first product feature;
-2. add a complete HTTP → queue → worker example when a real asynchronous use case exists;
-3. add authentication/authorization as an application module when the product requires it;
-4. add OpenTelemetry/distributed tracing and richer request/business metrics when operating across services;
-5. add WebSocket or scheduler modules only when the application needs them, with dedicated scaling guidance.
+Add those with the feature that creates the requirement instead of carrying unused generic infrastructure in the starter.
 
 ## License
 
