@@ -114,6 +114,18 @@ jobs:
             --network startkit-ci \
             --add-host host.docker.internal:host-gateway \
             -e APP_ENV=production \
+            -e CORS_ORIGIN='*' \
+            -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            startkit-nest:ci; then
+            echo "Production wildcard CORS unexpectedly booted"
+            exit 1
+          fi
+
+          if docker run --rm \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=production \
             -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e DB_SYNC=1 \
@@ -121,6 +133,13 @@ jobs:
             echo "Production DB_SYNC unexpectedly booted"
             exit 1
           fi
+
+          docker run --rm \
+            --network startkit-ci \
+            --add-host host.docker.internal:host-gateway \
+            -e APP_ENV=production \
+            -e DATABASE_URL=postgresql://startkit:startkit@host.docker.internal:5432/startkit \
+            startkit-nest:ci node scripts/typeorm-cli.mjs migration:show
 
           for replica in 1 2 3; do
             docker run -d \
