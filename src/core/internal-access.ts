@@ -1,5 +1,5 @@
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 
 const bearerToken = (authorizationHeader: string | undefined): string | null => {
   if (!authorizationHeader?.startsWith('Bearer ')) {
@@ -10,15 +10,11 @@ const bearerToken = (authorizationHeader: string | undefined): string | null => 
   return token.length > 0 ? token : null;
 };
 
-const constantTimeEquals = (left: string, right: string): boolean => {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
+const digest = (value: string): Buffer =>
+  createHash('sha256').update(value).digest();
 
-  return timingSafeEqual(leftBuffer, rightBuffer);
-};
+const constantTimeEquals = (left: string, right: string): boolean =>
+  timingSafeEqual(digest(left), digest(right));
 
 export const assertInternalEndpointAccess = (
   appEnv: string,
