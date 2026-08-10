@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { RedisService } from '@/redis/redis.service';
@@ -42,6 +42,10 @@ describe('DistributedRateLimitGuard', () => {
   const reflector = {
     getAllAndOverride: jest.fn().mockReturnValue(false),
   } as unknown as Reflector;
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('writes shared rate-limit headers', async () => {
     const redis = {
@@ -161,7 +165,7 @@ describe('DistributedRateLimitGuard', () => {
       redis,
     );
     const errorSpy = jest
-      .spyOn((guard as any).logger, 'error')
+      .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);
 
     await guard.canActivate(createContext().context);
