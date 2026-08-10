@@ -14,6 +14,7 @@ describe('validateEnvironment', () => {
       RATE_LIMIT_MAX: 600,
       RATE_LIMIT_TTL_SECONDS: 60,
       RATE_LIMIT_FAIL_OPEN: false,
+      RATE_LIMIT_RETRY_COOLDOWN_MS: 1000,
       HTTP_BODY_LIMIT_BYTES: 1048576,
       DEPENDENCY_CHECK_TIMEOUT_MS: 2000,
     });
@@ -76,5 +77,14 @@ describe('validateEnvironment', () => {
         RATE_LIMIT_FAIL_OPEN: '1',
       }),
     ).toMatchObject({ RATE_LIMIT_FAIL_OPEN: true });
+  });
+
+  it('rejects a non-positive rate limiter retry cooldown', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        RATE_LIMIT_RETRY_COOLDOWN_MS: '0',
+      }),
+    ).toThrow('Invalid RATE_LIMIT_RETRY_COOLDOWN_MS value');
   });
 });
