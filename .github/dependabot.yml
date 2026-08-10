@@ -29,3 +29,12 @@ updates:
       actions-updates:
         patterns:
           - "*"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:00"
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 5
