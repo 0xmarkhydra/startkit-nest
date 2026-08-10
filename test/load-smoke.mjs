@@ -7,12 +7,15 @@ const minInstances = Number(process.env.LOAD_MIN_INSTANCES || 1);
 for (const [name, value] of Object.entries({
   LOAD_REQUESTS: totalRequests,
   LOAD_CONCURRENCY: concurrency,
-  LOAD_P95_MAX_MS: maxP95Ms,
   LOAD_MIN_INSTANCES: minInstances,
 })) {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`${name} must be a positive number`);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
   }
+}
+
+if (!Number.isFinite(maxP95Ms) || maxP95Ms <= 0) {
+  throw new Error('LOAD_P95_MAX_MS must be a positive number');
 }
 
 let nextRequest = 0;
