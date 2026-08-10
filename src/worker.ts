@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { WorkerAppModule } from './worker-app.module';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.createApplicationContext(WorkerAppModule, {
     bufferLogs: true,
   });
@@ -13,7 +13,9 @@ async function bootstrap() {
   Logger.log('Worker is running');
 }
 
-bootstrap().catch((error) => {
-  Logger.error('Failed to start worker', error?.stack || error);
+bootstrap().catch((error: unknown) => {
+  const details =
+    error instanceof Error ? error.stack || error.message : String(error);
+  Logger.error('Failed to start worker', details);
   process.exit(1);
 });
