@@ -45,12 +45,13 @@ async function bootstrap(): Promise<void> {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const wildcardCors = corsOrigins.includes('*');
 
   app.useLogger(app.get(PinoLogger));
   app.enableShutdownHooks();
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : false,
-    credentials: true,
+    origin: wildcardCors ? '*' : corsOrigins.length > 0 ? corsOrigins : false,
+    credentials: !wildcardCors && corsOrigins.length > 0,
   });
   app.useGlobalPipes(
     new ValidationPipe({
