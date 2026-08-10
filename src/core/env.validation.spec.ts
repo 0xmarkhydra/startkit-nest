@@ -4,7 +4,6 @@ describe('validateEnvironment', () => {
   const validEnvironment = {
     APP_ENV: 'test',
     PORT: '8000',
-    DATABASE_URL: 'postgresql://user:pass@localhost:5432/database',
     REDIS_URL: 'redis://localhost:6379/0',
   };
 
@@ -12,21 +11,34 @@ describe('validateEnvironment', () => {
     expect(validateEnvironment(validEnvironment)).toMatchObject({
       APP_ENV: 'test',
       PORT: 8000,
-      DB_POOL_MAX: 10,
       RATE_LIMIT_MAX: 600,
       RATE_LIMIT_TTL_SECONDS: 60,
       RATE_LIMIT_FAIL_OPEN: false,
       HTTP_BODY_LIMIT_BYTES: 1048576,
+      DEPENDENCY_CHECK_TIMEOUT_MS: 2000,
     });
   });
 
-  it('rejects a missing database configuration', () => {
+  it('does not require database configuration from shared core validation', () => {
+    expect(() => validateEnvironment(validEnvironment)).not.toThrow();
+  });
+
+  it('rejects an unknown application environment', () => {
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
-        DATABASE_URL: '',
+        APP_ENV: 'prodution',
       }),
-    ).toThrow('Configure DATABASE_URL');
+    ).toThrow('Invalid APP_ENV value');
+  });
+
+  it('rejects a missing Redis configuration', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        REDIS_URL: '',
+      }),
+    ).toThrow('Configure REDIS_URL');
   });
 
   it('rejects an invalid port', () => {
@@ -36,15 +48,6 @@ describe('validateEnvironment', () => {
         PORT: '70000',
       }),
     ).toThrow('Invalid port value');
-  });
-
-  it('rejects an invalid database pool size', () => {
-    expect(() =>
-      validateEnvironment({
-        ...validEnvironment,
-        DB_POOL_MAX: '0',
-      }),
-    ).toThrow('Invalid DB_POOL_MAX value');
   });
 
   it('parses rate limiter fail-open flags', () => {
