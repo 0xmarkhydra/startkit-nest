@@ -88,6 +88,11 @@ export function validateEnvironment(config: Environment): Environment {
       'RATE_LIMIT_TTL_SECONDS',
     ),
     RATE_LIMIT_FAIL_OPEN: parseBooleanFlag(config.RATE_LIMIT_FAIL_OPEN, false),
+    RATE_LIMIT_RETRY_COOLDOWN_MS: parseInteger(
+      config.RATE_LIMIT_RETRY_COOLDOWN_MS,
+      1000,
+      'RATE_LIMIT_RETRY_COOLDOWN_MS',
+    ),
     WORKER_CONCURRENCY: parseInteger(
       config.WORKER_CONCURRENCY,
       10,
