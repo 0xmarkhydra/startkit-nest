@@ -1,6 +1,7 @@
 import { isValidProxyAddress } from './http-options';
 
 type Environment = Record<string, unknown>;
+type ProcessRole = 'api' | 'worker';
 
 const APP_ENVIRONMENTS = new Set(['development', 'test', 'production']);
 const LOG_LEVELS = new Set([
@@ -56,6 +57,14 @@ const parseBooleanFlag = (value: unknown, fallback = false): boolean => {
   }
 
   throw new Error(`Invalid boolean value: ${String(value)}`);
+};
+
+const parseProcessRole = (value: unknown): ProcessRole => {
+  const role = String(value || 'api').trim().toLowerCase();
+  if (role === 'api' || role === 'worker') {
+    return role;
+  }
+  throw new Error(`Invalid STARTKIT_PROCESS_ROLE value: ${String(value)}`);
 };
 
 const validateCorsOrigins = (value: unknown, appEnv: string): string[] => {
@@ -132,14 +141,11 @@ const validateInternalEndpointToken = (
   return token;
 };
 
-export function validateEnvironment(config: Environment): Environment {
-  const appEnv = String(config.APP_ENV || 'development').trim().toLowerCase();
-  if (!APP_ENVIRONMENTS.has(appEnv)) {
-    throw new Error(
-      `Invalid APP_ENV value: ${String(config.APP_ENV)}. Expected development, test or production`,
-    );
-  }
-
+const validateSharedEnvironment = (
+  config: Environment,
+  appEnv: string,
+  role: ProcessRole,
+): Environment => {
   const logLevel = String(
     config.LOG_LEVEL || (appEnv === 'production' ? 'info' : 'debug'),
   )
@@ -148,13 +154,6 @@ export function validateEnvironment(config: Environment): Environment {
   if (!LOG_LEVELS.has(logLevel)) {
     throw new Error(`Invalid LOG_LEVEL value: ${String(config.LOG_LEVEL)}`);
   }
-
-  const corsOrigins = validateCorsOrigins(config.CORS_ORIGIN, appEnv);
-  const trustProxy = validateTrustProxy(config.TRUST_PROXY, appEnv);
-  const internalEndpointToken = validateInternalEndpointToken(
-    config.INTERNAL_ENDPOINT_TOKEN,
-    appEnv,
-  );
 
   const hasRedisUrl = hasValue(config.REDIS_URL);
   const hasRedisHost = hasValue(config.REDIS_HOST);
@@ -171,12 +170,9 @@ export function validateEnvironment(config: Environment): Environment {
 
   return {
     ...config,
+    STARTKIT_PROCESS_ROLE: role,
     APP_ENV: appEnv,
     LOG_LEVEL: logLevel,
-    CORS_ORIGIN: corsOrigins.join(','),
-    INTERNAL_ENDPOINT_TOKEN: internalEndpointToken,
-    TRUST_PROXY: trustProxy,
-    PORT: parsePort(config.PORT, 8000),
     REDIS_PORT: parsePort(config.REDIS_PORT, 6379),
     REDIS_DATABASE: parseInteger(
       config.REDIS_DATABASE,
@@ -185,6 +181,22 @@ export function validateEnvironment(config: Environment): Environment {
       0,
     ),
     REDIS_FAMILY: redisFamily,
+  };
+};
+
+const validateApiEnvironment = (
+  config: Environment,
+  appEnv: string,
+): Environment => {
+  const corsOrigins = validateCorsOrigins(config.CORS_ORIGIN, appEnv);
+  return {
+    CORS_ORIGIN: corsOrigins.join(','),
+    INTERNAL_ENDPOINT_TOKEN: validateInternalEndpointToken(
+      config.INTERNAL_ENDPOINT_TOKEN,
+      appEnv,
+    ),
+    TRUST_PROXY: validateTrustProxy(config.TRUST_PROXY, appEnv),
+    PORT: parsePort(config.PORT, 8000),
     REDIS_CONNECT_TIMEOUT_MS: parseInteger(
       config.REDIS_CONNECT_TIMEOUT_MS,
       5000,
@@ -211,16 +223,6 @@ export function validateEnvironment(config: Environment): Environment {
       1000,
       'RATE_LIMIT_RETRY_COOLDOWN_MS',
     ),
-    WORKER_CONCURRENCY: parseInteger(
-      config.WORKER_CONCURRENCY,
-      10,
-      'WORKER_CONCURRENCY',
-    ),
-    WORKER_STARTUP_TIMEOUT_MS: parseInteger(
-      config.WORKER_STARTUP_TIMEOUT_MS,
-      10000,
-      'WORKER_STARTUP_TIMEOUT_MS',
-    ),
     HTTP_BODY_LIMIT_BYTES: parseInteger(
       config.HTTP_BODY_LIMIT_BYTES,
       1048576,
@@ -246,5 +248,39 @@ export function validateEnvironment(config: Environment): Environment {
       2000,
       'DEPENDENCY_CHECK_TIMEOUT_MS',
     ),
+  };
+};
+
+const validateWorkerEnvironment = (config: Environment): Environment => ({
+  WORKER_CONCURRENCY: parseInteger(
+    config.WORKER_CONCURRENCY,
+    10,
+    'WORKER_CONCURRENCY',
+  ),
+  WORKER_STARTUP_TIMEOUT_MS: parseInteger(
+    config.WORKER_STARTUP_TIMEOUT_MS,
+    10000,
+    'WORKER_STARTUP_TIMEOUT_MS',
+  ),
+});
+
+export function validateEnvironment(config: Environment): Environment {
+  const appEnv = String(config.APP_ENV || 'development').trim().toLowerCase();
+  if (!APP_ENVIRONMENTS.has(appEnv)) {
+    throw new Error(
+      `Invalid APP_ENV value: ${String(config.APP_ENV)}. Expected development, test or production`,
+    );
+  }
+
+  const role = parseProcessRole(config.STARTKIT_PROCESS_ROLE);
+  const shared = validateSharedEnvironment(config, appEnv, role);
+  const roleSpecific =
+    role === 'worker'
+      ? validateWorkerEnvironment(config)
+      : validateApiEnvironment(config, appEnv);
+
+  return {
+    ...shared,
+    ...roleSpecific,
   };
 }
