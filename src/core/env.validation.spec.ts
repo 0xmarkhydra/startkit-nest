@@ -32,6 +32,25 @@ describe('validateEnvironment', () => {
     ).toThrow('Invalid APP_ENV value');
   });
 
+  it('rejects credentialed wildcard CORS in production', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        APP_ENV: 'production',
+        CORS_ORIGIN: 'https://app.example.com,*',
+      }),
+    ).toThrow('CORS_ORIGIN cannot contain * in production');
+  });
+
+  it('allows wildcard CORS outside production', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        CORS_ORIGIN: '*',
+      }),
+    ).not.toThrow();
+  });
+
   it('rejects a missing Redis configuration', () => {
     expect(() =>
       validateEnvironment({
