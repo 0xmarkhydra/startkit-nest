@@ -62,7 +62,8 @@ export const configDb = registerAs(
 
     const synchronize = parseBoolean(process.env.DB_SYNC, 'DB_SYNC');
     const logging = parseBoolean(process.env.DB_DEBUG, 'DB_DEBUG');
-    if (process.env.APP_ENV === 'production' && synchronize) {
+    const appEnv = (process.env.APP_ENV || 'development').trim().toLowerCase();
+    if (appEnv === 'production' && synchronize) {
       throw new Error(
         'DB_SYNC must be disabled in production. Use database migrations instead',
       );
