@@ -12,6 +12,7 @@ const LOG_LEVELS = new Set([
   'fatal',
   'silent',
 ]);
+const MIN_INTERNAL_TOKEN_LENGTH = 32;
 
 const hasValue = (value: unknown): boolean =>
   typeof value === 'string' && value.trim().length > 0;
@@ -136,6 +137,23 @@ const validateTrustProxy = (value: unknown, appEnv: string): string => {
   throw new Error(`Invalid TRUST_PROXY value: ${String(value)}`);
 };
 
+const validateInternalEndpointToken = (
+  value: unknown,
+  appEnv: string,
+): string => {
+  const token = String(value ?? '').trim();
+  if (
+    appEnv === 'production' &&
+    token.length > 0 &&
+    token.length < MIN_INTERNAL_TOKEN_LENGTH
+  ) {
+    throw new Error(
+      `INTERNAL_ENDPOINT_TOKEN must be at least ${MIN_INTERNAL_TOKEN_LENGTH} characters when configured in production`,
+    );
+  }
+  return token;
+};
+
 export function validateEnvironment(config: Environment): Environment {
   const appEnv = String(config.APP_ENV || 'development').trim().toLowerCase();
   if (!APP_ENVIRONMENTS.has(appEnv)) {
@@ -155,6 +173,10 @@ export function validateEnvironment(config: Environment): Environment {
 
   const corsOrigins = validateCorsOrigins(config.CORS_ORIGIN, appEnv);
   const trustProxy = validateTrustProxy(config.TRUST_PROXY, appEnv);
+  const internalEndpointToken = validateInternalEndpointToken(
+    config.INTERNAL_ENDPOINT_TOKEN,
+    appEnv,
+  );
 
   const hasRedisUrl = hasValue(config.REDIS_URL);
   const hasRedisHost = hasValue(config.REDIS_HOST);
@@ -174,6 +196,7 @@ export function validateEnvironment(config: Environment): Environment {
     APP_ENV: appEnv,
     LOG_LEVEL: logLevel,
     CORS_ORIGIN: corsOrigins.join(','),
+    INTERNAL_ENDPOINT_TOKEN: internalEndpointToken,
     TRUST_PROXY: trustProxy,
     PORT: parsePort(config.PORT, 8000),
     REDIS_PORT: parsePort(config.REDIS_PORT, 6379),
