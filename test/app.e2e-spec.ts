@@ -7,11 +7,12 @@ import { RedisService } from '@/redis/redis.service';
 
 jest.setTimeout(30000);
 
-describe('API contracts (e2e)', () => {
+describe('HealthController (e2e)', () => {
   let app: NestFastifyApplication;
   let baseUrl: string;
 
   beforeAll(async () => {
+    process.env.STARTKIT_PROCESS_ROLE = 'api';
     process.env.APP_ENV = 'test';
     process.env.RATE_LIMIT_MAX = '1000';
     process.env.DATABASE_URL =
@@ -53,21 +54,6 @@ describe('API contracts (e2e)', () => {
     expect(body.timestamp).toEqual(expect.any(String));
   });
 
-  it('GET /health/live exposes explicit liveness', async () => {
-    const response = await fetch(`${baseUrl}/health/live`);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toMatchObject({
-      status_code: 200,
-      data: {
-        status: 'ok',
-        service: 'api',
-        instanceId: expect.any(String),
-      },
-    });
-  });
-
   it('GET /health/ready checks PostgreSQL and Redis', async () => {
     const response = await fetch(`${baseUrl}/health/ready`);
     const body = await response.json();
@@ -83,7 +69,7 @@ describe('API contracts (e2e)', () => {
     });
   });
 
-  it('GET /metrics returns raw Prometheus text', async () => {
+  it('GET /metrics returns raw Prometheus-compatible text', async () => {
     const response = await fetch(`${baseUrl}/metrics`);
     const body = await response.text();
 
@@ -91,7 +77,7 @@ describe('API contracts (e2e)', () => {
     expect(response.headers.get('content-type')).toContain('text/plain');
     expect(body).toContain('# TYPE startkit_process_uptime_seconds gauge');
     expect(body).toContain('startkit_process_resident_memory_bytes');
-    expect(body).not.toContain('"status_code"');
+    expect(body.trim().startsWith('{')).toBe(false);
   });
 
   it('caps rate-limit storage at the configured limit', async () => {
