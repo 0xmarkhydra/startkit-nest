@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.6"
   },
   "scripts": {
     "build": "nest build",
@@ -21,11 +21,11 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:load": "node test/load-smoke.mjs",
-    "migration:show": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:show",
-    "migration:run": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:run",
-    "migration:revert": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:revert",
-    "migration:generate": "pnpm run build && typeorm -d dist/modules/database/data-source.js migration:generate",
-    "migration:create": "typeorm migration:create",
+    "migration:show": "pnpm run build && node scripts/typeorm-cli.mjs migration:show",
+    "migration:run": "pnpm run build && node scripts/typeorm-cli.mjs migration:run",
+    "migration:revert": "pnpm run build && node scripts/typeorm-cli.mjs migration:revert",
+    "migration:generate": "pnpm run build && node scripts/typeorm-cli.mjs migration:generate",
+    "migration:create": "node scripts/typeorm-cli.mjs migration:create",
     "check": "pnpm run lint && pnpm run build && pnpm run test"
   },
   "dependencies": {
