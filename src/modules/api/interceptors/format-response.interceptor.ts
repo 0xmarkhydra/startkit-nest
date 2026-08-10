@@ -1,71 +1,60 @@
 import {
+  CallHandler,
+  ExecutionContext,
   Injectable,
   NestInterceptor,
-  ExecutionContext,
-  CallHandler,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { plainToInstance } from 'class-transformer';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Reflector } from '@nestjs/core';
-import { BaseResponse } from '@/shared/swagger/response/base.response';
 import { PaginationResponse } from '@/shared/pagination/pagination.interface';
-import { plainToInstance } from 'class-transformer';
 import { ResponseMessageKey } from '@/shared/decorators/response-message.decorator';
-
-interface Response<T> {
-  msg: string;
-  status_code: number;
-  data: T;
-}
+import { SKIP_RESPONSE_FORMAT_KEY } from '@/shared/decorators/skip-response-format.decorator';
+import { BaseResponse } from '@/shared/swagger/response/base.response';
 
 @Injectable()
 export class FormatResponseInterceptor<T>
-  implements NestInterceptor<T, BaseResponse<T>>
+  implements NestInterceptor<T, T | BaseResponse<T>>
 {
-  constructor(private reflector: Reflector) {}
+  constructor(private readonly reflector: Reflector) {}
+
   intercept(
     context: ExecutionContext,
     next: CallHandler,
-  ): Observable<BaseResponse<T>> {
+  ): Observable<T | BaseResponse<T>> {
+    const skipFormatting = this.reflector.getAllAndOverride<boolean>(
+      SKIP_RESPONSE_FORMAT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (skipFormatting) {
+      return next.handle();
+    }
+
     const responseMessage =
-      this.reflector.get<string>(ResponseMessageKey, context.getHandler()) ??
-      '';
+      this.reflector.get<string>(ResponseMessageKey, context.getHandler()) ?? '';
+
     return next.handle().pipe(
-      //   map((data: ResponseTemplate<T>) => {
       map((data: any) => {
-        if (
-          data?.pagination &&
-          Object.keys(
-            plainToInstance(PaginationResponse, data?.pagination, {
-              strategy: 'excludeAll',
-            }),
-          ).length
-        ) {
+        const statusCode = context
+          .switchToHttp()
+          .getResponse<{ statusCode: number }>().statusCode;
+        const pagination = plainToInstance(
+          PaginationResponse,
+          data?.pagination,
+          { strategy: 'excludeAll' },
+        );
+
+        if (data?.pagination && Object.keys(pagination).length > 0) {
           return new BaseResponse(
-            data?.data,
-            context
-              .switchToHttp()
-              .getResponse<{ statusCode: number }>().statusCode,
+            data.data,
+            statusCode,
             responseMessage,
-            data?.pagination,
-          );
-        } else {
-          return new BaseResponse(
-            data,
-            context
-              .switchToHttp()
-              .getResponse<{ statusCode: number }>().statusCode,
-            responseMessage,
+            data.pagination,
           );
         }
-        // return {
-        //   //   msg: data?.message,
-        //   msg: responseMessage,
-        //   status_code: context
-        //     .switchToHttp()
-        //     .getResponse<{ statusCode: number }>().statusCode,
-        //   data: data,
-        // };
+
+        return new BaseResponse(data, statusCode, responseMessage);
       }),
     );
   }
