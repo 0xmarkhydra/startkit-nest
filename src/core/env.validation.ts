@@ -1,4 +1,4 @@
-import { isIP } from 'net';
+import { isValidProxyAddress } from './http-options';
 
 type Environment = Record<string, unknown>;
 
@@ -89,28 +89,6 @@ const validateCorsOrigins = (value: unknown, appEnv: string): string[] => {
   }
 
   return origins;
-};
-
-const isValidProxyAddress = (value: string): boolean => {
-  const [address, prefix, ...extra] = value.split('/');
-  if (!address || extra.length > 0) {
-    return false;
-  }
-
-  const family = isIP(address);
-  if (family === 0) {
-    return false;
-  }
-
-  if (prefix === undefined) {
-    return true;
-  }
-  if (!/^\d+$/.test(prefix)) {
-    return false;
-  }
-
-  const prefixLength = Number(prefix);
-  return prefixLength >= 0 && prefixLength <= (family === 4 ? 32 : 128);
 };
 
 const validateTrustProxy = (value: unknown, appEnv: string): string => {
