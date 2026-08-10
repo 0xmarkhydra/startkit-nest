@@ -21,7 +21,7 @@ RUN apk add --no-cache tini
 COPY --from=build --chown=node:node /app/package.json ./package.json
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/scripts ./scripts
+COPY --from=build --chown=node:node /app/scripts/typeorm-cli.mjs ./scripts/typeorm-cli.mjs
 
 USER node
 EXPOSE 8000
