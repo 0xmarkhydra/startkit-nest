@@ -14,6 +14,8 @@ describe('configDb', () => {
     delete process.env.DB_SYNC;
     delete process.env.DB_DEBUG;
     delete process.env.DB_POOL_MAX;
+    delete process.env.DB_RETRY_ATTEMPTS;
+    delete process.env.DB_RETRY_DELAY_MS;
   });
 
   afterAll(() => {
@@ -33,6 +35,8 @@ describe('configDb', () => {
       url,
       synchronize: false,
       poolSize: 10,
+      retryAttempts: 3,
+      retryDelay: 1000,
     });
   });
 
@@ -58,17 +62,21 @@ describe('configDb', () => {
     expect(() => configDb()).toThrow('DB_SYNC must be disabled in production');
   });
 
-  it('parses explicit boolean flags and pool sizing', () => {
+  it('parses explicit boolean flags, pool sizing and retry settings', () => {
     process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/app';
     process.env.APP_ENV = 'test';
     process.env.DB_SYNC = 'yes';
     process.env.DB_DEBUG = 'on';
     process.env.DB_POOL_MAX = '7';
+    process.env.DB_RETRY_ATTEMPTS = '5';
+    process.env.DB_RETRY_DELAY_MS = '250';
 
     expect(configDb()).toMatchObject({
       synchronize: true,
       logging: true,
       poolSize: 7,
+      retryAttempts: 5,
+      retryDelay: 250,
     });
   });
 
@@ -78,5 +86,13 @@ describe('configDb', () => {
     process.env.DB_SYNC = 'sometimes';
 
     expect(() => configDb()).toThrow('Invalid DB_SYNC value');
+  });
+
+  it('rejects invalid database retry settings', () => {
+    process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/app';
+    process.env.APP_ENV = 'test';
+    process.env.DB_RETRY_ATTEMPTS = '0';
+
+    expect(() => configDb()).toThrow('Invalid DB_RETRY_ATTEMPTS value');
   });
 });

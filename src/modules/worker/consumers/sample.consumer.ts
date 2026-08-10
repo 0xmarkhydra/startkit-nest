@@ -21,9 +21,9 @@ export class SampleConsumer {
     name: QUEUE_PROCESSOR.SAMPLE.HANDLE,
     concurrency: workerConcurrency,
   })
-  async handle(job: Job<SampleJobPayload>) {
+  async handle(job: Job<SampleJobPayload>): Promise<{ processedAt: string }> {
     this.logger.info(
-      { jobId: job.id, message: job.data.message },
+      { jobId: job.id, attemptsMade: job.attemptsMade },
       'Processed sample queue job',
     );
 

@@ -1,13 +1,14 @@
-import { Queue } from 'bull';
+import { Job, Queue } from 'bull';
 import { QUEUE_PROCESSOR } from '@/shared/constants/queue';
-import { QueueService } from './queue.service';
+import { QueueService, SampleJobPayload } from './queue.service';
 
 describe('QueueService', () => {
   it('adds sample jobs with bounded retry, backoff and timeout defaults', async () => {
-    const add = jest.fn().mockResolvedValue({ id: 'job-1' });
-    const queue = { add } as unknown as Queue;
+    const mockJob = { id: 'job-1' } as unknown as Job<SampleJobPayload>;
+    const add = jest.fn().mockResolvedValue(mockJob);
+    const queue = { add } as unknown as Queue<SampleJobPayload>;
     const service = new QueueService(queue);
-    const payload = { message: 'hello' };
+    const payload: SampleJobPayload = { message: 'hello' };
 
     await service.addSampleJob(payload);
 

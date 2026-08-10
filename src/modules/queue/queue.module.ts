@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { resolveRedisConnection } from '@/redis/redis-connection';
 import { QUEUE_NAME } from '@/shared/constants/queue';
 import { QueueService } from './queue.service';
 
@@ -9,21 +10,10 @@ import { QueueService } from './queue.service';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const url = configService.get<string>('redis.url');
-        if (url) {
-          return { redis: url };
-        }
-
-        const family = configService.get<number>('redis.family');
+        const connection = resolveRedisConnection(configService);
         return {
-          redis: {
-            host: configService.getOrThrow<string>('redis.host'),
-            port: configService.getOrThrow<number>('redis.port'),
-            db: configService.get<number>('redis.database') || 0,
-            username: configService.get<string>('redis.username') || undefined,
-            password: configService.get<string>('redis.password') || undefined,
-            ...(family === 4 || family === 6 ? { family } : {}),
-          },
+          redis:
+            connection.mode === 'url' ? connection.url : connection.options,
         };
       },
     }),

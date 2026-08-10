@@ -1,36 +1,23 @@
-import { PaginationResponse } from '@/shared/pagination/pagination.interface';
 import { HttpStatus } from '@nestjs/common';
-import { Expose } from 'class-transformer';
+import { PaginationResponse } from '@/shared/pagination/pagination.interface';
 
 export class BaseResponse<T> {
-  @Expose()
-  data: T;
-
-  @Expose()
-  msg: string;
-
-  @Expose({ name: 'status_code' })
-  status_code: number;
-
-  @Expose({ name: 'timestamp' })
-  timestamp: string;
-
-  @Expose({ name: 'pagination' })
-  pagination?: PaginationResponse;
+  readonly data: T;
+  readonly msg: string;
+  readonly status_code: number;
+  readonly timestamp: string;
+  readonly pagination?: PaginationResponse;
 
   constructor(
     data: T,
     statusCode: number = HttpStatus.OK,
-    message?: string,
+    message = '',
     pagination?: PaginationResponse,
   ) {
-    this.msg = message || '';
     this.data = data;
+    this.msg = message;
     this.status_code = statusCode;
     this.timestamp = new Date().toISOString();
-
-    if (pagination) {
-      this.pagination = pagination;
-    }
+    this.pagination = pagination;
   }
 }

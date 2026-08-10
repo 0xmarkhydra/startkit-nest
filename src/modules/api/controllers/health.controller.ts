@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Headers,
   HttpStatus,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { assertInternalEndpointAccess } from '@/core/internal-access';
 import { RedisService } from '@/redis/redis.service';
 import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
 import { SkipRateLimit } from '@/shared/decorators/skip-rate-limit.decorator';
@@ -86,8 +88,14 @@ export class HealthController {
 
   @Get('dependencies')
   @ResponseMessage('Dependency status')
-  @ApiOperation({ summary: 'Dependency diagnostics without readiness policy' })
-  async dependenciesCheck() {
+  @ApiOperation({ summary: 'Protected dependency diagnostics' })
+  async dependenciesCheck(@Headers('authorization') authorization?: string) {
+    assertInternalEndpointAccess(
+      this.configService.get<string>('APP_ENV') || 'development',
+      this.configService.get<string>('INTERNAL_ENDPOINT_TOKEN'),
+      authorization,
+    );
+
     const dependencies = await this.checkDependencies();
     const healthy = Object.values(dependencies).every(
       (status) => status === 'connected',

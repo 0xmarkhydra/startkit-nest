@@ -1,4 +1,9 @@
-import { ArgumentsHost, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { GlobalExceptionFilter } from './GlobalExceptionFilter';
 
 const createHost = () => {
@@ -18,16 +23,22 @@ const createHost = () => {
 };
 
 describe('GlobalExceptionFilter', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('does not duplicate logs for an infrastructure error already logged upstream', () => {
     const filter = new GlobalExceptionFilter(false, false);
-    const logger = (filter as any).logger;
-    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
     const { host, response } = createHost();
 
     filter.catch(
       new ServiceUnavailableException({
         statusCode: 503,
         message: 'Rate limiting service unavailable',
+        error: 'Internal Redis detail',
         suppressErrorLog: true,
       }),
       host,
@@ -37,21 +48,41 @@ describe('GlobalExceptionFilter', () => {
     expect(response.status).toHaveBeenCalledWith(503);
     expect(response.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        statusCode: 503,
+        status_code: 503,
         message: 'Internal server error',
-        errorId: expect.any(String),
+        error_id: expect.any(String),
+        timestamp: expect.any(String),
       }),
+    );
+    expect(response.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.anything() }),
     );
   });
 
   it('still logs unexpected server errors', () => {
     const filter = new GlobalExceptionFilter(false, false);
-    const logger = (filter as any).logger;
-    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
     const { host } = createHost();
 
     filter.catch(new Error('boom'), host);
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the same snake-case envelope for client errors', () => {
+    const filter = new GlobalExceptionFilter(false, false);
+    const { host, response } = createHost();
+
+    filter.catch(new BadRequestException('Invalid request'), host);
+
+    expect(response.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status_code: 400,
+        message: 'Invalid request',
+        timestamp: expect.any(String),
+      }),
+    );
   });
 });

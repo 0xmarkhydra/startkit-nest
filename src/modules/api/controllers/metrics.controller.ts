@@ -1,6 +1,12 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Headers, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { assertInternalEndpointAccess } from '@/core/internal-access';
 import { SkipRateLimit } from '@/shared/decorators/skip-rate-limit.decorator';
 import { SkipResponseFormat } from '@/shared/decorators/skip-response-format.decorator';
+
+interface HeaderReply {
+  header(name: string, value: string): unknown;
+}
 
 @SkipRateLimit()
 @Controller('metrics')
@@ -8,10 +14,24 @@ export class MetricsController {
   private readonly instanceId =
     process.env.INSTANCE_ID || process.env.HOSTNAME || 'local';
 
+  constructor(private readonly configService: ConfigService) {}
+
   @Get()
   @SkipResponseFormat()
-  @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
-  metrics(): string {
+  metrics(
+    @Headers('authorization') authorization: string | undefined,
+    @Res({ passthrough: true }) response: HeaderReply,
+  ): string {
+    assertInternalEndpointAccess(
+      this.configService.get<string>('APP_ENV') || 'development',
+      this.configService.get<string>('INTERNAL_ENDPOINT_TOKEN'),
+      authorization,
+    );
+    response.header(
+      'Content-Type',
+      'text/plain; version=0.0.4; charset=utf-8',
+    );
+
     const memory = process.memoryUsage();
     const cpu = process.cpuUsage();
     const labels = `instance_id="${this.escapeLabel(this.instanceId)}"`;

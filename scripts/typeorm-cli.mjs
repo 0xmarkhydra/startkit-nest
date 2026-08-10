@@ -15,11 +15,10 @@ if (existsSync('.env')) {
   nodeArgs.push('--env-file=.env');
 }
 
-nodeArgs.push(typeormCli);
+nodeArgs.push(typeormCli, command, ...commandArgs);
 if (command !== 'migration:create') {
   nodeArgs.push('-d', 'dist/modules/database/data-source.js');
 }
-nodeArgs.push(command, ...commandArgs);
 
 const result = spawnSync(process.execPath, nodeArgs, {
   cwd: process.cwd(),

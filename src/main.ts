@@ -7,11 +7,13 @@ import {
 } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
-import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from '@/api/filters/GlobalExceptionFilter';
 import { parsePositiveIntegerEnv, parseTrustProxy } from './core/http-options';
 
-async function bootstrap() {
+process.env.STARTKIT_PROCESS_ROLE = 'api';
+
+async function bootstrap(): Promise<void> {
+  const { AppModule } = await import('./app.module');
   const adapter = new FastifyAdapter({
     trustProxy: parseTrustProxy(),
     bodyLimit: parsePositiveIntegerEnv(
@@ -45,12 +47,13 @@ async function bootstrap() {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const wildcardCors = corsOrigins.includes('*');
 
   app.useLogger(app.get(PinoLogger));
   app.enableShutdownHooks();
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : false,
-    credentials: true,
+    origin: wildcardCors ? '*' : corsOrigins.length > 0 ? corsOrigins : false,
+    credentials: !wildcardCors && corsOrigins.length > 0,
   });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -79,7 +82,9 @@ async function bootstrap() {
   Logger.log(`API is running at http://localhost:${port}`);
 }
 
-bootstrap().catch((error) => {
-  Logger.error('Failed to start API', error?.stack || error);
+bootstrap().catch((error: unknown) => {
+  const details =
+    error instanceof Error ? error.stack || error.message : String(error);
+  Logger.error('Failed to start API', details);
   process.exit(1);
 });
