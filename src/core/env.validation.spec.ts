@@ -22,6 +22,7 @@ describe('validateEnvironment', () => {
       RATE_LIMIT_TTL_SECONDS: 60,
       RATE_LIMIT_FAIL_OPEN: false,
       RATE_LIMIT_RETRY_COOLDOWN_MS: 1000,
+      WORKER_STARTUP_TIMEOUT_MS: 10000,
       HTTP_BODY_LIMIT_BYTES: 1048576,
       DEPENDENCY_CHECK_TIMEOUT_MS: 2000,
     });
@@ -199,5 +200,14 @@ describe('validateEnvironment', () => {
         RATE_LIMIT_RETRY_COOLDOWN_MS: '0',
       }),
     ).toThrow('Invalid RATE_LIMIT_RETRY_COOLDOWN_MS value');
+  });
+
+  it('rejects a non-positive worker startup timeout', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        WORKER_STARTUP_TIMEOUT_MS: '0',
+      }),
+    ).toThrow('Invalid WORKER_STARTUP_TIMEOUT_MS value');
   });
 });
