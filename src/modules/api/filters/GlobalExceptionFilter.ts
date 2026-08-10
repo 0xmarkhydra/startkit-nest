@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { safeRequestPath } from '@/core/request-safety';
 
 interface HttpRequestLike {
   method?: string;
@@ -50,12 +51,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
     const normalized = this.normalizeException(exception);
     const timestamp = new Date().toISOString();
+    const requestPath = safeRequestPath(request.url);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       const errorId = randomUUID();
       if (!this.shouldSuppressErrorLog(exception)) {
         this.logger.error(
-          `${request.method || 'HTTP'} ${request.url || 'unknown'} failed [${errorId}]`,
+          `${request.method || 'HTTP'} ${requestPath} failed [${errorId}]`,
           exception instanceof Error ? exception.stack : String(exception),
         );
       }
@@ -76,7 +78,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (this.logAllErrors) {
       this.logger.warn(
-        `${request.method || 'HTTP'} ${request.url || 'unknown'} returned ${status}: ${JSON.stringify(normalized.message)}`,
+        `${request.method || 'HTTP'} ${requestPath} returned ${status}: ${JSON.stringify(normalized.message)}`,
       );
     }
 
