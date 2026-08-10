@@ -60,6 +60,7 @@ import { validateEnvironment } from './env.validation';
             { method: RequestMethod.ALL, path: 'health/live' },
             { method: RequestMethod.ALL, path: 'health/ready' },
             { method: RequestMethod.ALL, path: 'health/dependencies' },
+            { method: RequestMethod.ALL, path: 'metrics' },
           ],
         };
       },
